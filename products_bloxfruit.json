@@ -1,0 +1,89 @@
+{
+  "accounts": [
+    {
+      "id": "bf-starter",
+      "name": "Blox Fruit Starter",
+      "level": "1-100",
+      "fruit": "None/Spin",
+      "price": "50.000đ",
+      "desc": "Account mới, chưa làm gì nhiều",
+      "stock": 15
+    },
+    {
+      "id": "bf-mid",
+      "name": "Blox Fruit Mid Game",
+      "level": "700-1000",
+      "fruit": "Random Rare-Legend",
+      "price": "150.000đ",
+      "desc": "Có fruit ngon, đủ đi farm",
+      "stock": 8
+    },
+    {
+      "id": "bf-pro",
+      "name": "Blox Fruit Pro",
+      "level": "1500-2000",
+      "fruit": "Dough/Dragon/Venom",
+      "price": "300.000đ",
+      "desc": "Max level, fruit hiếm, full item",
+      "stock": 5
+    },
+    {
+      "id": "bf-vip",
+      "name": "Blox Fruit VIP",
+      "level": "2450+",
+      "fruit": "Leopard/Control/Spirit",
+      "price": "500.000đ",
+      "desc": "Max stats, fruit Mythic, full gamepass",
+      "stock": 3
+    },
+    {
+      "id": "bf-mythic",
+      "name": "Blox Fruit Mythic",
+      "level": "2550",
+      "fruit": "Kitsune/Yeti/Mammoth",
+      "price": "800.000đ",
+      "desc": "Cực hiếm, đủ tộc, full gamepass",
+      "stock": 2
+    }
+  ],
+  "services": [
+    {
+      "name": "Boost Level 1-700",
+      "price": "100.000đ",
+      "desc": "Cày thuê 1-2 ngày"
+    },
+    {
+      "name": "Boost Level 700-1500",
+      "price": "200.000đ",
+      "desc": "Cày thuê 2-3 ngày"
+    },
+    {
+      "name": "Lấy Fruit Legend",
+      "price": "50.000đ",
+      "desc": "Roll đến khi ra"
+    },
+    {
+      "name": "Lấy Fruit Mythic",
+      "price": "150.000đ",
+      "desc": "Roll đến khi ra Mythic"
+    }
+  ],
+  "gamepass": [
+    {
+      "name": "2x Money",
+      "price": "80.000đ"
+    },
+    {
+      "name": "2x Drop",
+      "price": "80.000đ"
+    },
+    {
+      "name": "Fast Boats",
+      "price": "50.000đ"
+    },
+    {
+      "name": "Fruit Notifier",
+      "price": "100.000đ"
+    }
+  ]
+}
