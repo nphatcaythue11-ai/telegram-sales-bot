@@ -19,12 +19,12 @@ TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
 SHOP_NAME = os.environ.get('SHOP_NAME', 'Blox Fruit Store')
 SHOP_CONTACT = os.environ.get('SHOP_CONTACT', '@admin_bloxfruit')
 
-# ========== SẢN PHẨM: Chỉ 1 acc 450k 6 perm ==========
+# ========== SẢN PHẨM: Chỉ 1 acc 250k 6 perm ==========
 THE_ACCOUNT = {
-    "id": "bf-450k-6perm",
+    "id": "bf-250k-6perm",
     "name": "Blox Fruit 6 Perm",
-    "price": 450000,
-    "price_str": "450.000đ",
+    "price": 250000,
+    "price_str": "250.000đ",
     "level": "Max 2550",
     "fruit": "Leopard/Dough/Venom",
     "perms": ["2x Money", "2x Drop", "Fast Boats", "Fruit Notifier", "2x Mastery", "God Human"],
@@ -32,10 +32,10 @@ THE_ACCOUNT = {
     "items": ["Cursed Dual Katana", "Soul Guitar", "Valkyrie Helm"],
     "beli": "50M+",
     "fragments": "50k+",
-    "stock": 5,
+    "stock": 3,
     "desc": "Acc max level, 6 perm đầy đủ, fruit hiếm, full item",
-    "image_url": "https://i.imgur.com/bf450k.jpg",
-    "screenshots": ["https://i.imgur.com/bf450k_1.jpg", "https://i.imgur.com/bf450k_2.jpg"]
+    "image_url": "https://i.imgur.com/bf250k.jpg",
+    "screenshots": ["https://i.imgur.com/bf250k_1.jpg", "https://i.imgur.com/bf250k_2.jpg"]
 }
 
 # ========== FRUIT PRICES DATABASE (Robux) ==========
@@ -236,12 +236,14 @@ class ExpertAI:
             return "considering"
         
         # === FRUIT PRICE QUERIES === (Ưu tiên cao - kiểm tra TRƯỚC ask_price)
-        fruit_q = ["trái", "fruit", "quỷ", "bán trái", "giá trái", "mua trái", "dough", "dragon", 
-                   "leopard", "tiger", "venom", "buddha", "portal", "control", "spirit", "shadow", "phoenix",
-                   "t-rex", "trex", "mammoth", "yeti", "kitsune", "gas", "blizzard", "rumble", "sound",
-                   "spider", "love", "quake", "magma", "ghost", "creation", "barrier", "rubber", "light",
-                   "diamond", "dark", "sand", "ice", "eagle", "flame", "spike", "smoke", "bomb",
-                   "spring", "blade", "chop", "spin", "rocket", "east dragon", "west dragon", "rồng đông", "rồng tây"]
+        fruit_q = ["trái", "fruit", "quỷ", "bán trái", "giá trái", "mua trái", "vĩnh viễn", "perm",
+                   "dough", "dragon", "leopard", "tiger", "venom", "buddha", "portal", "control",
+                   "spirit", "shadow", "phoenix", "t-rex", "trex", "mammoth", "yeti", "kitsune",
+                   "gas", "blizzard", "rumble", "sound", "spider", "love", "quake", "magma",
+                   "ghost", "creation", "barrier", "rubber", "light", "diamond", "dark", "sand",
+                   "ice", "eagle", "flame", "spike", "smoke", "bomb", "spring", "blade", "chop",
+                   "spin", "rocket", "east dragon", "west dragon", "rồng đông", "rồng tây",
+                   "trái ác quỷ", "devil fruit", "trái cây"]
         has_fruit = any(w in text.lower() for w in fruit_q)
         
         # === GAMEPASS QUERIES === (Ưu tiên cao)
@@ -453,18 +455,79 @@ class ExpertAI:
         
         return {
             "type": "text",
-            "content": msg + "\n\n🎮 *Acc hot nhất hiện tại:*\n🔥 Blox Fruit 6 Perm - 450k\n• Max level 2550\n• 6 gamepass đầy đủ\n• Fruit hiếm\n\nGõ 'xem' hoặc 'giá' để biết thêm!",
+            "content": msg + "\n\n🎮 *CHỈ CÓ 1 LOẠI ACC:*\n🔥 Blox Fruit 6 Perm - 250k\n• Max level 2550\n• 6 gamepass đầy đủ\n• Fruit hiếm\n• KHÔNG có acc 100k, 150k, 300k...\n\nGõ 'xem' hoặc 'giá' để biết thêm!",
             "next_action": None
         }
     
     def _handle_price_inquiry(self, user_id, analysis):
-        """Xử lý hỏi giá"""
+        """Xử lý hỏi giá - Chỉ có 1 loại acc 250k"""
         budget = analysis.get("budget_hint")
         
+        # Nếu khách hỏi giá quá thấp (dưới 200k)
+        if budget and budget < 200000:
+            return {
+                "type": "text",
+                "content": f"""� *XIN LỖI ANH/CHỊ*
+
+Phát **KHÔNG BÁN** acc giá {budget:,}đ ạ.
+
+🚫 *Lý do:*
+• Acc giá rẻ thường bị ban, scam nhiều
+• Không đủ 6 perm, cày rất mệt
+• Không có fruit hiếm
+
+✅ *CHỈ CÓ DUY NHẤT 1 LOẠI ACC:*
+🔥 Blox Fruit 6 Perm - **250.000đ**
+
+📊 *Acc 250k có:*
+• Level Max 2550 (full stats)
+• 6 Gamepass đầy đủ
+• Fruit hiếm (Leopard/Dough/Venom)
+• Beli 50M+, Fragments 50k+
+• Item hiếm: CDK, Soul Guitar
+• Bảo hành 7 ngày
+
+💡 *So với acc rẻ:*
+• Không lo bị ban
+• Vào chơi max ngay
+• Không cần cày 2-3 tuần
+
+Anh/chị có thể lên 250k không ạ? 😊""",
+                "next_action": "ask_upgrade_budget"
+            }
+        
+        # Nếu khách hỏi giá cao hơn (300k+)
+        if budget and budget >= 300000:
+            return {
+                "type": "text",
+                "content": f"""😊 *THÔNG BÁO*
+
+Phát chỉ bán **1 loại acc duy nhất** giá **250.000đ** ạ.
+
+✅ *KHÔNG CÓ* acc giá {budget:,}đ hay cao hơn.
+
+🔥 *ACC CÓ SẴN:* Blox Fruit 6 Perm - 250k
+
+📊 *Trong acc có:*
+• Level Max 2550 (full stats)
+• 6 Gamepass: 2x Money, 2x Drop, Fast Boats, Fruit Notifier, 2x Mastery, God Human
+• Fruit hiếm: Leopard/Dough/Venom
+• Beli 50M+, Fragments 50k+
+• Item hiếm: CDK, Soul Guitar
+• Bảo hành 7 ngày
+
+💡 *Dùng {budget:,}đ mua acc 250k,*
+*số dư còn lại có thể mua thêm trái cây!*
+
+Anh/chị quan tâm acc 250k không? 🎮""",
+                "next_action": "ask_commitment"
+            }
+        
+        # Giá đúng 250k hoặc không đề cập giá cụ thể
         msg = f"""💰 *GIÁ ACC BLOX FRUIT*
 
-🎯 *ACC 6 PERM (Hot nhất)*
-💵 Giá: *450.000đ*
+🎯 *CHỈ CÓ DUY NHẤT 1 LOẠI ACC:*
+🔥 Blox Fruit 6 Perm - **250.000đ**
 
 📊 *Trong acc có:*
 ✅ Level Max 2550 (full stats)
@@ -481,12 +544,15 @@ class ExpertAI:
 • Support sau mua
 • Bảo hành 7 ngày
 
-💡 *So với tự cày:*
-• Tiết kiệm 2-3 tuần cày
-• Không cần roll fruit (tiết kiệm 200k+)
-• Vào chơi max ngay
+� *KHÔNG CÓ* acc giá khác (100k, 150k, 300k, 500k...)
 
-Anh/chị thấy giá hợp lý không ạ? 😊"""
+💡 *Sao nên mua acc 250k?*
+• Không lo bị ban như acc rẻ
+• Tiết kiệm 2-3 tuần cày
+• Vào chơi max ngay
+• Uy tín, bảo hành đầy đủ
+
+Anh/chị chốt acc 250k nhé? 😊"""
 
         return {"type": "text", "content": msg, "next_action": "ask_commitment"}
     
@@ -717,39 +783,42 @@ Anh/chị yên tâm mua nhé! 🙏""",
         }
     
     def _handle_product_inquiry(self, user_id, analysis):
-        """Xử lý hỏi sản phẩm"""
+        """Xử lý hỏi sản phẩm - Acc, Trái cây, Gamepass"""
         return {
             "type": "text",
-            "content": """🎮 *THÔNG TIN ACC BLOX FRUIT*
+            "content": f"""🎮 *SHOP PHÁT - BLOX FRUIT*
 
-📦 *Tên:* Blox Fruit 6 Perm
-💰 *Giá:* 450.000đ
-📊 *Level:* Max 2550 (All stats max)
-🍎 *Fruit:* Leopard/Dough/Venom (random)
+💎 *1. ACC BLOX FRUIT (DUY NHẤT)*
+📦 Tên: Blox Fruit 6 Perm
+💰 Giá: 250.000đ
+📊 Level: Max 2550
+🍎 Fruit: Leopard/Dough/Venom
+⚡ 6 Perm đầy đủ
+✅ Không có acc giá khác!
 
-⚡ *6 PERM ĐẦY ĐỦ:*
-1️⃣ 2x Money - Farm beli nhanh
-2️⃣ 2x Drop - Rớt item dễ hơn
-3️⃣ Fast Boats - Di chuyển nhanh
-4️⃣ Fruit Notifier - Biết fruit spawn
-5️⃣ 2x Mastery - Lên cấp nhanh
-6️⃣ God Human - Tộc mạnh nhất
+🍎 *2. TRÁI CÂY VĨNH VIỄN (PERM)*
+📊 {len(FRUIT_PRICES_RB)} loại trái cây
+💰 Tính giá: RB × {FRUIT_RATE}đ
+🔥 Dough: 2,400 RB = {2_400 * FRUIT_RATE:,}đ
+🔥 Leopard: 3,000 RB = {3_000 * FRUIT_RATE:,}đ
+🔥 Dragon: 5,000 RB = {5_000 * FRUIT_RATE:,}đ
+💡 Nhắn "giá + tên trái" để xem giá
 
-🎒 *Item có sẵn:*
-• Cursed Dual Katana (Hiếm)
-• Soul Guitar (Hiếm)
-• Valkyrie Helm (Hiếm)
-• Beli: 50M+
-• Fragments: 50k+
+⚡ *3. GAMEPASS*
+📊 {len(GAMEPASS_PRICES_RB)} loại
+💰 Tính giá: RB × {FRUIT_RATE}đ
+🔥 2x Money: 450 RB = {450 * FRUIT_RATE:,}đ
+🔥 Fruit Notifier: 2,700 RB = {2_700 * FRUIT_RATE:,}đ
+🔥 Dark Blade: 1,200 RB = {1_200 * FRUIT_RATE:,}đ
+💡 Nhắn "giá + tên gamepass"
 
-✨ *Ưu điểm:*
-• Vào chơi max ngay
-• Không cần cày
-• Đủ sức đua top
-• Farm boss dễ dàng
+🎯 *Ưu đãi:*
+• Mua acc + trái: Giảm 10%
+• Mua acc + gamepass: Giảm 10%
+• Mua combo: Giảm thêm!
 
-Cần xem ảnh acc không ạ? 📸""",
-            "next_action": "ask_image"
+Cần tư vấn gì thêm ạ? �""",
+            "next_action": "ask_selection"
         }
     
     def _handle_image_request(self, user_id, analysis):
@@ -1012,7 +1081,7 @@ def handle_message(msg):
 📊 Tính giá: RB × Tỷ lệ = Giá VNĐ
 
 🔥 *SẢN PHẨM:*
-💎 Acc 6 Perm - *450.000đ*
+💎 Acc 6 Perm - *250.000đ* (DUY NHẤT)
 🍎 {len(FRUIT_PRICES_RB)} loại trái cây
 ⚡ {len(GAMEPASS_PRICES_RB)} loại Gamepass
 
@@ -1038,7 +1107,7 @@ def handle_message(msg):
             if 50 <= new_rate <= 500:
                 global FRUIT_RATE
                 FRUIT_RATE = new_rate
-                send_message(chat_id, f"✅ *Đã đổi tỷ lệ!*\n\n📊 Tỷ lệ mới: *1 RB = {FRUIT_RATE}đ*\n\n🍎 Giá trái sẽ tự động tính lại!\n⚡ Giá Gamepass cũng đổi theo!\n\nVD: Dough 2,400 RB × {FRUIT_RATE} = {2_400 * FRUIT_RATE:,}đ")
+                send_message(chat_id, f"✅ *Đã đổi tỷ lệ!*\n\n📊 Tỷ lệ mới: *1 RB = {FRUIT_RATE}đ*\n\n🍎 Giá trái sẽ tự động tính lại!\n⚡ Giá Gamepass cũng đổi theo!\n\nVD: Dough 2,400 RB × {FRUIT_RATE} = {2_400 * FRUIT_RATE:,}đ\n\n💎 Giá acc vẫn là 250.000đ (KHÔNG đổi)")
             else:
                 send_message(chat_id, "❌ Tỷ lệ phải từ 50đ đến 500đ / 1 RB")
         else:
@@ -1079,7 +1148,8 @@ def main():
     print("🤖 PHAT BOT - GOD LEVEL AI (MAX INTELLIGENCE)")
     print("=" * 60)
     print("✅ AI: Expert + Human Language Understanding")
-    print(f"✅ Acc: Blox Fruit 6 Perm - 450k")
+    print(f"✅ Acc: Blox Fruit 6 Perm - 250k (DUY NHẤT)")
+    print(f"✅ Không có acc 100k, 150k, 300k...")
     print(f"✅ Trái cây: {len(FRUIT_PRICES_RB)} loại (mới nhất)")
     print(f"✅ Gamepass: {len(GAMEPASS_PRICES_RB)} loại")
     print(f"✅ Tỷ lệ: 1 RB = {FRUIT_RATE}đ (có thể đổi)")
