@@ -1,0 +1,5 @@
+# Không upload file này lên GitHub
+.env
+__pycache__/
+*.pyc
+bot_debug.log
