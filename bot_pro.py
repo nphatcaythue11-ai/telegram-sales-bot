@@ -38,6 +38,67 @@ THE_ACCOUNT = {
     "screenshots": ["https://i.imgur.com/bf450k_1.jpg", "https://i.imgur.com/bf450k_2.jpg"]
 }
 
+# ========== FRUIT PRICES DATABASE (Robux) ==========
+# Giá gốc trong game (Robux)
+FRUIT_PRICES_RB = {
+    # Common
+    "Rocket": 5, "Spin": 7, "Chop": 30, "Spring": 60, "Bomb": 80,
+    "Smoke": 100, "Spike": 180,
+    # Uncommon  
+    "Flame": 250, "Falcon": 300, "Ice": 350, "Sand": 420, "Dark": 500,
+    "Diamond": 600, "Light": 650, "Rubber": 750, "Barrier": 800,
+    # Rare
+    "Ghost": 940, "Magma": 960, "Quake": 1000, "Buddha": 1200, "Love": 1300,
+    # Legendary
+    "Spider": 1800, "Phoenix": 1800, "Portal": 1900, "Sound": 1900,
+    "Rumble": 2100, "Pain": 2300, "Blizzard": 2400, "Gravity": 2500,
+    # Mythic
+    "Mammoth": 2700, "T-Rex": 2700, "Dough": 2800, "Shadow": 2900,
+    "Venom": 3000, "Gas": 3000, "Control": 3200, "Spirit": 3400,
+    "Dragon": 3500, "Leopard": 5000, "Yeti": 5000, "Kitsune": 8000,
+}
+
+# TỶ LỆ QUY ĐỔI (Rate) - CÓ THỂ THAY ĐỔI
+# VD: RT = 130 nghĩa là 1 RB = 130 VNĐ
+FRUIT_RATE = 130  # Đồng/Robux - THAY ĐỔI ĐƯỢC
+
+def calculate_fruit_price(fruit_name: str, rate: int = FRUIT_RATE) -> dict:
+    """Tính giá trái cây theo tỷ lệ"""
+    fruit_name = fruit_name.title()
+    if fruit_name in FRUIT_PRICES_RB:
+        rb_price = FRUIT_PRICES_RB[fruit_name]
+        vnd_price = rb_price * rate
+        return {
+            "fruit": fruit_name,
+            "rb": rb_price,
+            "rate": rate,
+            "vnd": vnd_price,
+            "vnd_str": f"{vnd_price:,}đ"
+        }
+    return None
+
+def get_all_fruit_prices(rate: int = FRUIT_RATE) -> list:
+    """Lấy tất cả giá trái theo tỷ lệ"""
+    result = []
+    for fruit, rb in sorted(FRUIT_PRICES_RB.items(), key=lambda x: x[1]):
+        vnd = rb * rate
+        result.append({
+            "fruit": fruit,
+            "rb": rb,
+            "vnd": vnd,
+            "vnd_str": f"{vnd:,}đ"
+        })
+    return result
+
+def search_fruits_by_price_range(min_vnd: int, max_vnd: int, rate: int = FRUIT_RATE) -> list:
+    """Tìm trái theo khoảng giá"""
+    result = []
+    for fruit, rb in FRUIT_PRICES_RB.items():
+        vnd = rb * rate
+        if min_vnd <= vnd <= max_vnd:
+            result.append({"fruit": fruit, "rb": rb, "vnd": vnd, "vnd_str": f"{vnd:,}đ"})
+    return result
+
 # ========== CHUYÊN GIA AI - PHÁT ==========
 class ExpertAI:
     """Chuyên gia tư vấn Blox Fruit - Hiểu mọi ngôn ngữ"""
@@ -142,6 +203,20 @@ class ExpertAI:
         
         product_q = ["có gì", "có acc", "acc nào", "có loại", "có mấy", "có không"]
         if any(w in text for w in product_q):
+            return "ask_product"
+        
+        # === FRUIT PRICE QUERIES ===
+        fruit_q = ["trái", "fruit", "quỷ", "bán trái", "giá trái", "mua trái", "dough", "dragon", 
+                   "leopard", "venom", "buddha", "portal", "control", "spirit", "shadow", "phoenix",
+                   "t-rex", "mammoth", "yeti", "kitsune", "gas", "blizzard", "rumble", "sound",
+                   "spider", "love", "quake", "magma", "ghost", "barrier", "rubber", "light",
+                   "diamond", "dark", "sand", "ice", "falcon", "flame", "spike", "smoke", "bomb",
+                   "spring", "chop", "spin", "rocket"]
+        if any(w in text.lower() for w in fruit_q):
+            # Kiểm tra có phải hỏi giá không
+            price_indicators = ["giá", "bao nhiêu", "bn", "tiền", "mua", "bán", "k", "nghìn", "ngàn"]
+            if any(p in text for p in price_indicators):
+                return "ask_fruit_price"
             return "ask_product"
         
         image_q = ["ảnh", "hình", "xem", "screenshot", "preview", "chụp", "hình ảnh"]
@@ -269,6 +344,9 @@ class ExpertAI:
         if analysis["intent"] == "ask_price":
             return self._handle_price_inquiry(user_id, analysis)
         
+        if analysis["intent"] == "ask_fruit_price":
+            return self._handle_fruit_price(user_id, analysis, text)
+        
         if analysis["intent"] == "ask_trust":
             return self._handle_trust_objection(user_id, analysis)
         
@@ -348,6 +426,103 @@ class ExpertAI:
 Anh/chị thấy giá hợp lý không ạ? 😊"""
 
         return {"type": "text", "content": msg, "next_action": "ask_commitment"}
+    
+    def _handle_fruit_price(self, user_id, analysis, text):
+        """Xử lý hỏi giá trái cây - Tính RB × RT"""
+        text_lower = text.lower()
+        
+        # Tìm tên trái trong tin nhắn
+        found_fruit = None
+        for fruit in FRUIT_PRICES_RB.keys():
+            if fruit.lower() in text_lower:
+                found_fruit = fruit
+                break
+        
+        # Nếu tìm thấy trái cụ thể
+        if found_fruit:
+            price_info = calculate_fruit_price(found_fruit, FRUIT_RATE)
+            
+            # Kiểm tra có đề cập đến rate khác không
+            rate_match = re.search(r'(\d+)', text)
+            custom_rate = None
+            if rate_match:
+                potential_rate = int(rate_match.group(1))
+                if 50 <= potential_rate <= 500 and potential_rate != FRUIT_RATE:
+                    custom_rate = potential_rate
+                    price_info = calculate_fruit_price(found_fruit, custom_rate)
+            
+            rate_text = f"Tỷ lệ: 1 RB = {price_info['rate']}đ"
+            if custom_rate:
+                rate_text += " (tỷ lệ tùy chỉnh)"
+            
+            msg = f"""🍎 *GIÁ TRÁI {found_fruit.upper()}*
+
+💎 *Trong game:* {price_info['rb']:,} RB
+📊 *Tỷ lệ:* 1 RB = {price_info['rate']:,}đ
+💰 *Giá bán:* **{price_info['vnd_str']}**
+
+{rate_text}
+
+✨ *So sánh:*
+• Mua trong game: {price_info['rb']:,} RB (khó kiếm)
+• Mua ở Phát: {price_info['vnd_str']} (nhanh gọn)
+• Tiết kiệm: Không cần cày/nạp Robux
+
+💡 *Có thể thay đổi tỷ lệ:*
+Nhắn "giá {found_fruit} tỷ lệ 120" để tính với tỷ lệ khác!
+
+Muốn mua trái này không ạ? 🛒"""
+            
+            return {"type": "text", "content": msg, "next_action": "ask_fruit_buy"}
+        
+        # Nếu không tìm thấy trái cụ thể - hiện bảng giá
+        all_prices = get_all_fruit_prices(FRUIT_RATE)
+        
+        # Phân loại theo tier
+        common = [f for f in all_prices if f['rb'] <= 200]
+        uncommon = [f for f in all_prices if 200 < f['rb'] <= 800]
+        rare = [f for f in all_prices if 800 < f['rb'] <= 1500]
+        legendary = [f for f in all_prices if 1500 < f['rb'] <= 2500]
+        mythic = [f for f in all_prices if f['rb'] > 2500]
+        
+        msg = f"""🍎 *BẢNG GIÁ TRÁI CÂY BLOX FRUIT*
+📊 *Tỷ lệ quy đổi:* 1 RB = {FRUIT_RATE}đ
+
+💚 *Common (Dễ kiếm):*
+"""
+        for f in common[:5]:
+            msg += f"• {f['fruit']}: {f['rb']} RB = {f['vnd_str']}\n"
+        
+        msg += f"""
+💙 *Uncommon:*
+"""
+        for f in uncommon[:5]:
+            msg += f"• {f['fruit']}: {f['rb']} RB = {f['vnd_str']}\n"
+        
+        msg += f"""
+💜 *Rare:*
+• Buddha: 1,200 RB = {calculate_fruit_price('Buddha')['vnd_str']}
+• Love: 1,300 RB = {calculate_fruit_price('Love')['vnd_str']}
+
+💛 *Legendary:*
+• Portal: 1,900 RB = {calculate_fruit_price('Portal')['vnd_str']}
+• Rumble: 2,100 RB = {calculate_fruit_price('Rumble')['vnd_str']}
+• Blizzard: 2,400 RB = {calculate_fruit_price('Blizzard')['vnd_str']}
+
+❤️ *Mythic (Hiếm):*
+• Dough: 2,800 RB = {calculate_fruit_price('Dough')['vnd_str']}
+• Dragon: 3,500 RB = {calculate_fruit_price('Dragon')['vnd_str']}
+• Leopard: 5,000 RB = {calculate_fruit_price('Leopard')['vnd_str']}
+• Kitsune: 8,000 RB = {calculate_fruit_price('Kitsune')['vnd_str']}
+
+💡 *Cách mua:*
+Nhắn "giá + tên trái" vd: "giá Dough", "giá Leopard"
+
+🎯 *Ưu đãi:* Mua kèm acc giảm 10% giá trái!
+
+Trái nào anh/chị thích? 🍎"""
+        
+        return {"type": "text", "content": msg, "next_action": "ask_fruit_selection"}
     
     def _handle_trust_objection(self, user_id, analysis):
         """Xử lý nghi ngờ uy tín"""
@@ -672,18 +847,42 @@ def handle_message(msg):
     if text == '/start':
         send_message(chat_id, f"""👋 *Chào {user_name}!*
 
-Em là *Phát* - Chuyên gia Blox Fruit 🎮
-500+ đơn thành công | Uy tín 100%
+🤖 Em là *Phát* - Chuyên gia Blox Fruit SIÊU THÔNG MINH
+📊 Tính giá trái: RB × Tỷ lệ = Giá VNĐ
 
-🔥 *ACC HOT:* Blox Fruit 6 Perm - *450k*
-• Max level 2550
-• 6 perm đầy đủ
-• Fruit hiếm
+🔥 *SẢN PHẨM HOT:*
+💎 Acc 6 Perm - *450.000đ*
+🍎 Bán trái cây theo giá Robux
 
 💡 *Hỏi em bất cứ gì:*
-"giá" | "ảnh" | "mua" | "uy tín"
+• "giá" | "ảnh" | "mua" | "uy tín"
+• "giá Dough" | "giá Leopard"
+• "giá trái" - Xem bảng giá tất cả
 
-Em hiểu mọi ngôn ngữ! 😊""")
+🧠 Em hiểu: tiếng Việt, slang, từ lóng, typo!
+Ví dụ: "dough bao nhiêu", "trái rồng giá sao" 😊""")
+        return
+    
+    # Lệnh xem/chỉnh tỷ lệ giá
+    if text.startswith('/tyle') or text.startswith('/rate') or 'tỷ lệ' in text.lower():
+        # Kiểm tra có số mới không
+        rate_match = re.search(r'(\d+)', text)
+        if rate_match:
+            new_rate = int(rate_match.group(1))
+            if 50 <= new_rate <= 500:
+                global FRUIT_RATE
+                FRUIT_RATE = new_rate
+                send_message(chat_id, f"✅ *Đã đổi tỷ lệ!*\n\n📊 Tỷ lệ mới: *1 RB = {FRUIT_RATE}đ*\n\n💡 Giá trái cây sẽ tự động tính lại theo tỷ lệ mới!\n\nVí dụ: Dough 2,800 RB × {FRUIT_RATE} = {2_800 * FRUIT_RATE:,}đ")
+            else:
+                send_message(chat_id, "❌ Tỷ lệ phải từ 50đ đến 500đ / 1 RB")
+        else:
+            send_message(chat_id, f"📊 *TỶ LỆ GIÁ HIỆN TẠI*\n\n1 Robux (RB) = {FRUIT_RATE} VNĐ\n\n💡 Công thức: Số RB × {FRUIT_RATE} = Giá tiền\n\nVD: Leopard 5,000 RB × {FRUIT_RATE} = {5_000 * FRUIT_RATE:,}đ\n\n� Đổi tỷ lệ: Nhắn '/tyle 120' hoặc 'tỷ lệ 150'")
+        return
+    
+    # Lệnh xem tất cả giá trái
+    if text in ['/fruit', '/trai', 'giá trái', 'bảng giá trái']:
+        response = god_ai._handle_fruit_price(user_id, {}, text)
+        send_message(chat_id, response["content"])
         return
     
     # Typing effect
@@ -705,10 +904,12 @@ last_update_id = 0
 
 def main():
     print("=" * 60)
-    print("🤖 PHAT BOT - GOD LEVEL AI")
+    print("🤖 PHAT BOT - GOD LEVEL AI (SIÊU THÔNG MINH)")
     print("=" * 60)
-    print("✅ AI: Expert Level - Hiểu mọi ngôn ngữ")
-    print(f"✅ Sản phẩm: Blox Fruit 6 Perm - 450k")
+    print("✅ AI: Expert + Fruit Calculator")
+    print(f"✅ Acc: Blox Fruit 6 Perm - 450k")
+    print(f"✅ Trái cây: {len(FRUIT_PRICES_RB)} loại - Tỷ lệ 1 RB = {FRUIT_RATE}đ")
+    print("✅ Tính năng: Đổi tỷ lệ giá (/tyle)")
     print("=" * 60)
     
     if not TELEGRAM_TOKEN:
