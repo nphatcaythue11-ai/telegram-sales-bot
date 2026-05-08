@@ -39,23 +39,38 @@ THE_ACCOUNT = {
 }
 
 # ========== FRUIT PRICES DATABASE (Robux) ==========
-# Giá gốc trong game (Robux)
+# Giá PERM trong game - CẬP NHẬT MỚI NHẤT
 FRUIT_PRICES_RB = {
     # Common
-    "Rocket": 5, "Spin": 7, "Chop": 30, "Spring": 60, "Bomb": 80,
-    "Smoke": 100, "Spike": 180,
+    "Rocket": 50, "Spin": 75, "Blade": 100, "Spring": 180, "Bomb": 220,
+    "Smoke": 250, "Spike": 380,
     # Uncommon  
-    "Flame": 250, "Falcon": 300, "Ice": 350, "Sand": 420, "Dark": 500,
-    "Diamond": 600, "Light": 650, "Rubber": 750, "Barrier": 800,
+    "Flame": 550, "Ice": 750, "Sand": 850, "Dark": 950, "Eagle": 975,
+    "Diamond": 1000, "Light": 1100, "Rubber": 1200,
     # Rare
-    "Ghost": 940, "Magma": 960, "Quake": 1000, "Buddha": 1200, "Love": 1300,
+    "Ghost": 1275, "Magma": 1300, "Quake": 1500, "Buddha": 1650, "Love": 1700,
+    "Creation": 1750,
     # Legendary
-    "Spider": 1800, "Phoenix": 1800, "Portal": 1900, "Sound": 1900,
-    "Rumble": 2100, "Pain": 2300, "Blizzard": 2400, "Gravity": 2500,
+    "Spider": 1800, "Sound": 1900, "Phoenix": 2000, "Portal": 2000,
+    "Rumble": 2100, "Pain": 2200, "Blizzard": 2250, "Gravity": 2300,
     # Mythic
-    "Mammoth": 2700, "T-Rex": 2700, "Dough": 2800, "Shadow": 2900,
-    "Venom": 3000, "Gas": 3000, "Control": 3200, "Spirit": 3400,
-    "Dragon": 3500, "Leopard": 5000, "Yeti": 5000, "Kitsune": 8000,
+    "Mammoth": 2350, "T-Rex": 2350, "Dough": 2400, "Shadow": 2425,
+    "Venom": 2450, "Gas": 2500, "Spirit": 2550, "Leopard": 3000,
+    "Tiger": 3000, "Yeti": 3000, "Kitsune": 4000, "Control": 4000,
+    "East Dragon": 5000, "West Dragon": 5000,
+}
+
+# ========== GAMEPASS PRICES ==========
+GAMEPASS_PRICES_RB = {
+    "+1 Fruit Storage": 400,
+    "2x Mastery": 450,
+    "2x Money": 450,
+    "Fast Boats": 350,
+    "2x Boss Drops": 350,
+    "Dark Blade": 1200,
+    "Legendary Scrolls": 800,
+    "Mythical Scrolls": 1500,
+    "Fruit Notifier": 2700,
 }
 
 # TỶ LỆ QUY ĐỔI (Rate) - CÓ THỂ THAY ĐỔI
@@ -76,6 +91,34 @@ def calculate_fruit_price(fruit_name: str, rate: int = FRUIT_RATE) -> dict:
             "vnd_str": f"{vnd_price:,}đ"
         }
     return None
+
+def calculate_gamepass_price(gp_name: str, rate: int = FRUIT_RATE) -> dict:
+    """Tính giá gamepass theo tỷ lệ"""
+    # Tìm gamepass gần đúng
+    for name, rb in GAMEPASS_PRICES_RB.items():
+        if gp_name.lower() in name.lower() or name.lower() in gp_name.lower():
+            vnd_price = rb * rate
+            return {
+                "name": name,
+                "rb": rb,
+                "rate": rate,
+                "vnd": vnd_price,
+                "vnd_str": f"{vnd_price:,}đ"
+            }
+    return None
+
+def get_all_gamepass_prices(rate: int = FRUIT_RATE) -> list:
+    """Lấy tất cả giá gamepass"""
+    result = []
+    for name, rb in sorted(GAMEPASS_PRICES_RB.items(), key=lambda x: x[1]):
+        vnd = rb * rate
+        result.append({
+            "name": name,
+            "rb": rb,
+            "vnd": vnd,
+            "vnd_str": f"{vnd:,}đ"
+        })
+    return result
 
 def get_all_fruit_prices(rate: int = FRUIT_RATE) -> list:
     """Lấy tất cả giá trái theo tỷ lệ"""
@@ -207,11 +250,11 @@ class ExpertAI:
         
         # === FRUIT PRICE QUERIES ===
         fruit_q = ["trái", "fruit", "quỷ", "bán trái", "giá trái", "mua trái", "dough", "dragon", 
-                   "leopard", "venom", "buddha", "portal", "control", "spirit", "shadow", "phoenix",
-                   "t-rex", "mammoth", "yeti", "kitsune", "gas", "blizzard", "rumble", "sound",
-                   "spider", "love", "quake", "magma", "ghost", "barrier", "rubber", "light",
-                   "diamond", "dark", "sand", "ice", "falcon", "flame", "spike", "smoke", "bomb",
-                   "spring", "chop", "spin", "rocket"]
+                   "leopard", "tiger", "venom", "buddha", "portal", "control", "spirit", "shadow", "phoenix",
+                   "t-rex", "trex", "mammoth", "yeti", "kitsune", "gas", "blizzard", "rumble", "sound",
+                   "spider", "love", "quake", "magma", "ghost", "creation", "barrier", "rubber", "light",
+                   "diamond", "dark", "sand", "ice", "eagle", "flame", "spike", "smoke", "bomb",
+                   "spring", "blade", "chop", "spin", "rocket", "east dragon", "west dragon", "rồng đông", "rồng tây"]
         if any(w in text.lower() for w in fruit_q):
             # Kiểm tra có phải hỏi giá không
             price_indicators = ["giá", "bao nhiêu", "bn", "tiền", "mua", "bán", "k", "nghìn", "ngàn"]
@@ -222,6 +265,16 @@ class ExpertAI:
         image_q = ["ảnh", "hình", "xem", "screenshot", "preview", "chụp", "hình ảnh"]
         if any(w in text for w in image_q):
             return "ask_image"
+        
+        # === GAMEPASS QUERIES ===
+        gamepass_q = ["gamepass", "2x money", "2x drop", "fast boats", "fruit notifier", 
+                      "dark blade", "mastery", "storage", "scrolls", "boss drops", 
+                      "2x mastery", "legendary scrolls", "mythical scrolls", "+1 fruit"]
+        if any(w in text.lower() for w in gamepass_q):
+            price_indicators = ["giá", "bao nhiêu", "bn", "tiền", "mua", "bán"]
+            if any(p in text for p in price_indicators):
+                return "ask_gamepass_price"
+            return "ask_product"
         
         comparison = ["so sánh", "khác nhau", "nên chọn", "con nào", "loại nào", "hơn", "kém"]
         if any(w in text for w in comparison):
@@ -346,6 +399,9 @@ class ExpertAI:
         
         if analysis["intent"] == "ask_fruit_price":
             return self._handle_fruit_price(user_id, analysis, text)
+        
+        if analysis["intent"] == "ask_gamepass_price":
+            return self._handle_gamepass_price(user_id, analysis, text)
         
         if analysis["intent"] == "ask_trust":
             return self._handle_trust_objection(user_id, analysis)
@@ -523,6 +579,104 @@ Nhắn "giá + tên trái" vd: "giá Dough", "giá Leopard"
 Trái nào anh/chị thích? 🍎"""
         
         return {"type": "text", "content": msg, "next_action": "ask_fruit_selection"}
+    
+    def _handle_gamepass_price(self, user_id, analysis, text):
+        """Xử lý hỏi giá Gamepass"""
+        text_lower = text.lower()
+        
+        # Tìm gamepass cụ thể
+        found_gp = None
+        for gp_name in GAMEPASS_PRICES_RB.keys():
+            if gp_name.lower() in text_lower:
+                found_gp = gp_name
+                break
+            # Check từ khóa rút gọn
+            if "2x money" in text_lower and "money" in gp_name.lower():
+                found_gp = gp_name
+                break
+            if "mastery" in text_lower and "mastery" in gp_name.lower():
+                found_gp = gp_name
+                break
+            if "fast boat" in text_lower or "thuyền" in text_lower:
+                found_gp = "Fast Boats"
+                break
+            if "fruit notifier" in text_lower or "notifier" in text_lower:
+                found_gp = "Fruit Notifier"
+                break
+            if "dark blade" in text_lower or "kiếm" in text_lower():
+                found_gp = "Dark Blade"
+                break
+            if "storage" in text_lower or "kho" in text_lower():
+                found_gp = "+1 Fruit Storage"
+                break
+            if "scroll" in text_lower or "cuộn" in text_lower():
+                if "legendary" in text_lower:
+                    found_gp = "Legendary Scrolls"
+                elif "mythical" in text_lower or "mythic" in text_lower:
+                    found_gp = "Mythical Scrolls"
+                break
+        
+        if found_gp:
+            price_info = calculate_gamepass_price(found_gp, FRUIT_RATE)
+            
+            # Check tỷ lệ tùy chỉnh
+            rate_match = re.search(r'(\d+)', text)
+            custom_rate = None
+            if rate_match:
+                potential_rate = int(rate_match.group(1))
+                if 50 <= potential_rate <= 500 and potential_rate != FRUIT_RATE:
+                    custom_rate = potential_rate
+                    price_info = calculate_gamepass_price(found_gp, custom_rate)
+            
+            msg = f"""⚡ *GIÁ GAMEPASS {price_info['name'].upper()}*
+
+💎 *Trong game:* {price_info['rb']:,} RB
+📊 *Tỷ lệ:* 1 RB = {price_info['rate']}đ
+💰 *Giá bán:* **{price_info['vnd_str']}**
+
+✨ *So sánh:*
+• Mua trong game: Cần nạp Robux (khó)
+• Mua ở Phát: {price_info['vnd_str']} (nhanh, rẻ hơn)
+
+💡 *Có thể đổi tỷ lệ:*
+Nhắn "giá {price_info['name']} tỷ lệ 120"
+
+🎁 *Ưu đãi:* Mua kèm acc giảm 10%!
+
+Muốn mua gamepass này không ạ? 🛒"""
+            
+            return {"type": "text", "content": msg, "next_action": "ask_gamepass_buy"}
+        
+        # Hiện bảng giá tất cả gamepass
+        all_gp = get_all_gamepass_prices(FRUIT_RATE)
+        
+        msg = f"""⚡ *BẢNG GIÁ GAMEPASS BLOX FRUIT*
+📊 Tỷ lệ: 1 RB = {FRUIT_RATE}đ
+
+🎯 *GAMEPASS CƠ BẢN:*
+"""
+        for gp in all_gp[:4]:
+            msg += f"• {gp['name']}: {gp['rb']} RB = {gp['vnd_str']}\n"
+        
+        msg += f"""
+⚔️ *GAMEPASS ĐẶC BIỆT:*
+"""
+        for gp in all_gp[4:]:
+            msg += f"• {gp['name']}: {gp['rb']} RB = {gp['vnd_str']}\n"
+        
+        msg += f"""
+💡 *Cách mua:*
+Nhắn "giá + tên gamepass"
+VD: "giá 2x Money", "giá Fruit Notifier"
+
+🎁 *Ưu đãi:*
+• Mua kèm acc: Giảm 10%
+• Mua combo 2 GP: Giảm 15%
+• Mua combo 3 GP+: Giảm 20%
+
+Gamepass nào anh/chị cần? ⚡"""
+        
+        return {"type": "text", "content": msg, "next_action": "ask_gamepass_selection"}
     
     def _handle_trust_objection(self, user_id, analysis):
         """Xử lý nghi ngờ uy tín"""
@@ -847,41 +1001,52 @@ def handle_message(msg):
     if text == '/start':
         send_message(chat_id, f"""👋 *Chào {user_name}!*
 
-🤖 Em là *Phát* - Chuyên gia Blox Fruit SIÊU THÔNG MINH
-📊 Tính giá trái: RB × Tỷ lệ = Giá VNĐ
+🤖 Em là *Phát* - Chuyên gia Blox Fruit **GOD LEVEL**
+📊 Tính giá: RB × Tỷ lệ = Giá VNĐ
 
-🔥 *SẢN PHẨM HOT:*
+🔥 *SẢN PHẨM:*
 💎 Acc 6 Perm - *450.000đ*
-🍎 Bán trái cây theo giá Robux
+🍎 {len(FRUIT_PRICES_RB)} loại trái cây
+⚡ {len(GAMEPASS_PRICES_RB)} loại Gamepass
 
-💡 *Hỏi em bất cứ gì:*
-• "giá" | "ảnh" | "mua" | "uy tín"
-• "giá Dough" | "giá Leopard"
-• "giá trái" - Xem bảng giá tất cả
+💡 *Cách hỏi giá:*
+• "giá Dough" | "giá Leopard" | "giá Kitsune"
+• "giá 2x Money" | "giá Fruit Notifier"
+• "giá trái" - Xem tất cả trái
+• "giá gamepass" - Xem tất cả GP
 
-🧠 Em hiểu: tiếng Việt, slang, từ lóng, typo!
-Ví dụ: "dough bao nhiêu", "trái rồng giá sao" 😊""")
+⚙️ *Lệnh:*
+• /tyle 150 - Đổi tỷ lệ RB
+• /trai - Bảng giá trái
+• /gamepass - Bảng giá GP
+
+🧠 Em hiểu mọi ngôn ngữ: "dough bn", "trái rồng giá sao" 😊""")
         return
     
     # Lệnh xem/chỉnh tỷ lệ giá
     if text.startswith('/tyle') or text.startswith('/rate') or 'tỷ lệ' in text.lower():
-        # Kiểm tra có số mới không
         rate_match = re.search(r'(\d+)', text)
         if rate_match:
             new_rate = int(rate_match.group(1))
             if 50 <= new_rate <= 500:
                 global FRUIT_RATE
                 FRUIT_RATE = new_rate
-                send_message(chat_id, f"✅ *Đã đổi tỷ lệ!*\n\n📊 Tỷ lệ mới: *1 RB = {FRUIT_RATE}đ*\n\n💡 Giá trái cây sẽ tự động tính lại theo tỷ lệ mới!\n\nVí dụ: Dough 2,800 RB × {FRUIT_RATE} = {2_800 * FRUIT_RATE:,}đ")
+                send_message(chat_id, f"✅ *Đã đổi tỷ lệ!*\n\n📊 Tỷ lệ mới: *1 RB = {FRUIT_RATE}đ*\n\n🍎 Giá trái sẽ tự động tính lại!\n⚡ Giá Gamepass cũng đổi theo!\n\nVD: Dough 2,400 RB × {FRUIT_RATE} = {2_400 * FRUIT_RATE:,}đ")
             else:
                 send_message(chat_id, "❌ Tỷ lệ phải từ 50đ đến 500đ / 1 RB")
         else:
-            send_message(chat_id, f"📊 *TỶ LỆ GIÁ HIỆN TẠI*\n\n1 Robux (RB) = {FRUIT_RATE} VNĐ\n\n💡 Công thức: Số RB × {FRUIT_RATE} = Giá tiền\n\nVD: Leopard 5,000 RB × {FRUIT_RATE} = {5_000 * FRUIT_RATE:,}đ\n\n� Đổi tỷ lệ: Nhắn '/tyle 120' hoặc 'tỷ lệ 150'")
+            send_message(chat_id, f"📊 *TỶ LỆ GIÁ HIỆN TẠI*\n\n1 Robux (RB) = {FRUIT_RATE} VNĐ\n\n💡 Công thức: RB × {FRUIT_RATE} = Giá tiền\n\n🍎 Dough 2,400 RB = {2_400 * FRUIT_RATE:,}đ\n⚡ Fruit Notifier 2,700 RB = {2_700 * FRUIT_RATE:,}đ\n\n📝 Đổi tỷ lệ: /tyle 150")
         return
     
     # Lệnh xem tất cả giá trái
-    if text in ['/fruit', '/trai', 'giá trái', 'bảng giá trái']:
+    if text in ['/fruit', '/trai', '/gia', 'giá trái', 'bảng giá trái']:
         response = god_ai._handle_fruit_price(user_id, {}, text)
+        send_message(chat_id, response["content"])
+        return
+    
+    # Lệnh xem tất cả giá gamepass
+    if text in ['/gamepass', '/gp', 'giá gamepass', 'bảng giá gamepass']:
+        response = god_ai._handle_gamepass_price(user_id, {}, text)
         send_message(chat_id, response["content"])
         return
     
@@ -904,12 +1069,14 @@ last_update_id = 0
 
 def main():
     print("=" * 60)
-    print("🤖 PHAT BOT - GOD LEVEL AI (SIÊU THÔNG MINH)")
+    print("🤖 PHAT BOT - GOD LEVEL AI (MAX INTELLIGENCE)")
     print("=" * 60)
-    print("✅ AI: Expert + Fruit Calculator")
+    print("✅ AI: Expert + Human Language Understanding")
     print(f"✅ Acc: Blox Fruit 6 Perm - 450k")
-    print(f"✅ Trái cây: {len(FRUIT_PRICES_RB)} loại - Tỷ lệ 1 RB = {FRUIT_RATE}đ")
-    print("✅ Tính năng: Đổi tỷ lệ giá (/tyle)")
+    print(f"✅ Trái cây: {len(FRUIT_PRICES_RB)} loại (mới nhất)")
+    print(f"✅ Gamepass: {len(GAMEPASS_PRICES_RB)} loại")
+    print(f"✅ Tỷ lệ: 1 RB = {FRUIT_RATE}đ (có thể đổi)")
+    print("✅ Tính năng: Tính giá RB × Rate = VNĐ")
     print("=" * 60)
     
     if not TELEGRAM_TOKEN:
