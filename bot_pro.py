@@ -1,6 +1,6 @@
 """
 TELEGRAM BOT - CHUYÊN VIÊN TƯ VẤN BLOX FRUIT TOP 1
-Tư vấn chuyên nghiệp, chốt đơn cực kỳ
+Tư vấn viên: Phát | Chốt đơn cực kỳ | Hỗ trợ 24/7
 """
 
 import http.client
@@ -16,7 +16,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
 SHOP_NAME = os.environ.get('SHOP_NAME', 'Blox Fruit Store')
 SHOP_CONTACT = os.environ.get('SHOP_CONTACT', '@admin_bloxfruit')
-PAYMENT_INFO = os.environ.get('PAYMENT_INFO', 'MB Bank: 0123456789\nChủ TK: NGUYEN VAN A')
+PAYMENT_INFO = os.environ.get('PAYMENT_INFO', '💰 *THANH TOÁN*\n\n📱 ZaloPay: `0343603537`\n🏦 BIDV: `8806532434`\n👤 Chủ TK: *TRAN NGUYEN PHAT*\n\n💳 *Sau khi CK:*\n1. Chụp màn hình gửi Phát\n2. Nhận acc trong 1-2 phút')
 
 # ========== LOAD PRODUCTS ==========
 PRODUCTS = {}
@@ -34,8 +34,21 @@ except:
     }
 
 # ========== AI CONVERSATION ENGINE ==========
+# ========== DATA STORAGE ==========
+user_carts = {}        # Giỏ hàng user: {user_id: [{item, qty, price}]}
+user_orders = {}       # Đơn hàng: {user_id: [{id, items, status, time}]}
+promo_codes = {        # Mã giảm giá
+    'PHAT10': 0.10,    # Giảm 10%
+    'VIP20': 0.20,     # Giảm 20%
+    'BF2024': 50000,   # Giảm 50k
+}
+active_promos = [      # Khuyến mãi đang chạy
+    "🎉 *KHUYẾN MÃI HOT*\nMua 2 acc giảm 15%",
+    "⚡ *FLASH SALE*\nAcc VIP giảm 100k hôm nay!",
+]
+
 class SalesAI:
-    """Chuyên viên tư vấn Blox Fruit"""
+    """Chuyên viên tư vấn Blox Fruit - Phát"""
     
     def __init__(self):
         self.context = {}  # Lưu context từng user
@@ -59,6 +72,11 @@ class SalesAI:
             'compare': ['so sánh', 'khác nhau', 'nên mua', 'con nào', 'acc nào'],
             'complaint_price': ['đắt', 'mắc', 'giảm', 'sale', 'giảm giá', 'chiết khấu'],
             'ask_safe': ['có uy tín', 'có scam', 'tin được', 'bảo hành', 'có bảo hành'],
+            'cart': ['giỏ hàng', 'xem giỏ', 'cart', 'đã chọn', 'tổng tiền'],
+            'promo': ['mã giảm', 'khuyến mãi', 'giảm giá', 'code', 'voucher', 'sale'],
+            'order': ['đơn hàng', 'kiểm tra đơn', 'order', 'status', 'theo dõi'],
+            'feedback': ['đánh giá', 'feedback', 'review', 'cảm nhận', 'góp ý'],
+            'cancel': ['hủy', 'bỏ', 'không mua', 'thôi', 'cancel'],
         }
         
         for intent, keywords in intents.items():
@@ -79,7 +97,7 @@ class SalesAI:
         # ===== CHÀO HỎI & TẠO THIỆN CẢM =====
         if intent == 'chat_only':
             greetings = [
-                f"👋 *Chào anh/chị!* Em là Linh, chuyên tư vấn Blox Fruit ạ.\n\nAnh/chị đang tìm account gì ạ? Starter để chơi mới hay Pro để đua top? 😊",
+                f"👋 *Chào anh/chị!* Em là *Phát*, chuyên tư vấn Blox Fruit ạ.\n\nAnh/chị đang tìm account gì ạ? Starter để chơi mới hay Pro để đua top? 😊",
                 f"👋 *Xin chào!* Shop em chuyên Blox Fruit account uy tín ạ!\n\nHiện đang có {len(PRODUCTS.get('accounts', []))} loại account từ 50k đến 800k. Anh/chị ngân sách khoảng bao nhiêu ạ? 💰",
             ]
             return random.choice(greetings)
@@ -307,23 +325,144 @@ Chọn số hoặc nói rõ acc nào để em chuẩn bị! 💪"""
 
 Anh/chị muốn cày hay mua acc sẵn? 🤔"""
         
+        # ===== GIỎ HÀNG =====
+        if intent == 'cart':
+            cart = user_carts.get(user_id, [])
+            if not cart:
+                return "🛒 *Giỏ hàng trống*\n\nHãy chọn acc để thêm vào giỏ nhé! Gõ 'mua acc' để xem menu 😊"
+            
+            total = sum(item['price'] * item['qty'] for item in cart)
+            cart_text = "🛒 *GIỎ HÀNG CỦA BẠN*\n\n"
+            for i, item in enumerate(cart, 1):
+                cart_text += f"{i}. {item['name']} x{item['qty']} = {item['price'] * item['qty']:,}đ\n"
+            cart_text += f"\n💰 *Tổng: {total:,}đ*\n\n"
+            cart_text += "💳 Gõ 'thanh toán' để đặt hàng\n"
+            cart_text += "➕ Gõ 'mua acc' để thêm"
+            return cart_text
+        
+        # ===== KHUYẾN MÃI =====
+        if intent == 'promo':
+            promo_text = "🎁 *MÃ GIẢM GIÁ HIỆN CÓ*\n\n"
+            for code, discount in promo_codes.items():
+                if isinstance(discount, float):
+                    promo_text += f"• `{code}`: Giảm *{int(discount*100)}%*\n"
+                else:
+                    promo_text += f"• `{code}`: Giảm *{discount:,}đ*\n"
+            
+            promo_text += "\n🔥 *KHUYẾN MÃI HOT*\n"
+            promo_text += random.choice(active_promos)
+            
+            promo_text += "\n\n💡 *Cách dùng:* Nhắn mã code khi thanh toán\nVí dụ: 'Mã PHAT10'"
+            return promo_text
+        
+        # ===== ĐƠN HÀNG =====
+        if intent == 'order':
+            orders = user_orders.get(user_id, [])
+            if not orders:
+                return "📦 *Chưa có đơn hàng nào*\n\nMua acc ngay để có đơn đầu tiên! 🎮"
+            
+            order_text = "📦 *LỊCH SỬ ĐƠN HÀNG*\n\n"
+            for i, order in enumerate(orders[-5:], 1):  # 5 đơn gần nhất
+                status_emoji = {"pending": "⏳", "paid": "✅", "delivered": "📦"}.get(order['status'], "❓")
+                order_text += f"{status_emoji} *Đơn #{order['id']}*\n"
+                order_text += f"   Sản phẩm: {order['items']}\n"
+                order_text += f"   Tổng: {order['total']:,}đ\n"
+                order_text += f"   Trạng thái: {order['status']}\n\n"
+            return order_text
+        
+        # ===== FEEDBACK =====
+        if intent == 'feedback':
+            return """⭐ *ĐÁNH GIÁ DỊCH VỤ*
+
+Anh/chị vui lòng đánh giá sau khi nhận acc:
+
+⭐⭐⭐⭐⭐ - Tuyệt vời, hài lòng
+⭐⭐⭐⭐ - Tốt, đáng mua
+⭐⭐⭐ - Bình thường
+⭐⭐ - Cần cải thiện
+⭐ - Không hài lòng
+
+💬 Hoặc nhắn góp ý trực tiếp cho Phát!
+
+Cảm ơn anh/chị đã ủng hộ shop! 🙏"""
+        
+        # ===== HỦY ĐƠN =====
+        if intent == 'cancel':
+            # Xóa giỏ hàng
+            if user_id in user_carts:
+                del user_carts[user_id]
+            return "🗑️ Đã xóa giỏ hàng!\n\nAnh/chị có thể chọn lại bất cứ lúc nào nhé 😊"
+        
         # ===== DEFAULT - TƯ VẤN CHUNG =====
-        return """🤔 *Em chưa hiểu lắm...*
+        return """🤔 *Em Phát chưa hiểu lắm...*
 
 Anh/chị có thể hỏi:
 • "Giá account" 💰
 • "Còn hàng không" 📦
 • "Acc level bao nhiêu" 📊
 • "Có fruit gì" 🍎
+• "Khuyến mãi" 🎁
+• "Giỏ hàng" 🛒
+• "Đơn hàng" 📦
 • "Thanh toán thế nào" 💳
 • "Có uy tín không" ✅
 
 Hoặc gõ */start* để xem menu! 😊
 
-Em sẵn sàng tư vấn 24/7! 🚀"""
+Phát sẵn sàng tư vấn 24/7! 🚀"""
 
 # Khởi tạo AI
 sales_ai = SalesAI()
+
+# ========== CART & ORDER FUNCTIONS ==========
+def add_to_cart(user_id, product_name, price):
+    """Thêm sản phẩm vào giỏ hàng"""
+    if user_id not in user_carts:
+        user_carts[user_id] = []
+    
+    # Kiểm tra sản phẩm đã có chưa
+    for item in user_carts[user_id]:
+        if item['name'] == product_name:
+            item['qty'] += 1
+            return
+    
+    # Thêm mới
+    user_carts[user_id].append({
+        'name': product_name,
+        'price': price,
+        'qty': 1
+    })
+
+def apply_promo(total, promo_code):
+    """Áp dụng mã giảm giá"""
+    if promo_code.upper() in promo_codes:
+        discount = promo_codes[promo_code.upper()]
+        if isinstance(discount, float):
+            return int(total * (1 - discount))
+        else:
+            return max(0, total - discount)
+    return total
+
+def create_order(user_id, items, total, promo=None):
+    """Tạo đơn hàng mới"""
+    if user_id not in user_orders:
+        user_orders[user_id] = []
+    
+    order_id = f"ORD{datetime.now().strftime('%Y%m%d%H%M%S')}{user_id}"
+    
+    final_total = apply_promo(total, promo) if promo else total
+    
+    order = {
+        'id': order_id,
+        'items': items,
+        'total': final_total,
+        'promo': promo,
+        'status': 'pending',
+        'time': datetime.now().isoformat(),
+    }
+    
+    user_orders[user_id].append(order)
+    return order_id, final_total
 
 # ========== TELEGRAM API ==========
 def telegram_api(method, data=None):
@@ -387,20 +526,24 @@ def start_keep_alive():
 def handle_start(chat_id, user_name):
     welcome = f"""👋 *Chào {user_name}!*
 
-Em là *Linh* - Chuyên tư vấn Blox Fruit 🎮
+Em là *Phát* 🎮
+Chuyên gia tư vấn Blox Fruit | 500+ đơn thành công
 
-🛍️ *Hiện có:*
-• Account Blox Fruit (50k-800k)
-• Cày thuê, boost level
-• Gamepass, fruit roll
+🛍️ *SHOP BLOX FRUIT*
+• Acc Starter → VIP: 50k - 800k
+• Dịch vụ cày thuê, boost
+• Gamepass giá rẻ
 
-💡 *Hỏi em bất cứ gì:*
-- "Giá account"
-- "Còn acc VIP không"  
-- "Thanh toán thế nào"
-- "Có uy tín không"
+🎁 *TÍNH NĂNG MỚI*
+• 🛒 "Giỏ hàng" - Xem/Tổng tiền
+• 🎁 "Khuyến mãi" - Mã giảm giá
+• 📦 "Đơn hàng" - Theo dõi đơn
+• ⭐ "Feedback" - Đánh giá
 
-Sẵn sàng chốt đơn cho anh/chị! 🚀"""
+💡 *Thử ngay:*
+→ "Mua acc" | "Giá" | "Khuyến mãi"
+
+Sẵn sàng chốt đơn! 🚀"""
     
     send_message(chat_id, welcome)
 
@@ -415,6 +558,26 @@ def handle_message(msg):
     # Commands
     if text == '/start':
         handle_start(chat_id, user_name)
+        return
+    
+    if text in ['/cart', 'giỏ hàng']:
+        reply = sales_ai.get_response(user_id, 'giỏ hàng')
+        send_message(chat_id, reply)
+        return
+    
+    if text in ['/promo', '/sale', 'khuyến mãi']:
+        reply = sales_ai.get_response(user_id, 'khuyến mãi')
+        send_message(chat_id, reply)
+        return
+    
+    if text in ['/order', '/don', 'đơn hàng']:
+        reply = sales_ai.get_response(user_id, 'đơn hàng')
+        send_message(chat_id, reply)
+        return
+    
+    if text in ['/feedback', 'feedback']:
+        reply = sales_ai.get_response(user_id, 'feedback')
+        send_message(chat_id, reply)
         return
     
     # Hiện typing
@@ -449,12 +612,13 @@ def bot_loop():
             time.sleep(5)
 
 def main():
-    print("=" * 50)
-    print("🤖 BLOX FRUIT PRO BOT")
-    print("=" * 50)
+    print("=" * 60)
+    print("🤖 BLOX FRUIT PRO BOT - Tư vấn viên: PHÁT")
+    print("=" * 60)
     print(f"✅ Shop: {SHOP_NAME}")
     print(f"✅ Contact: {SHOP_CONTACT}")
-    print("=" * 50)
+    print(f"✅ Tư vấn viên: Phát (Chuyên gia BF)")
+    print("=" * 60)
     
     if not TELEGRAM_TOKEN:
         print("❌ Thiếu TELEGRAM_BOT_TOKEN")
