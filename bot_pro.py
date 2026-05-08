@@ -235,9 +235,33 @@ class ExpertAI:
         if any(w in text for w in weak_buy):
             return "considering"
         
+        # === FRUIT PRICE QUERIES === (Ưu tiên cao - kiểm tra TRƯỚC ask_price)
+        fruit_q = ["trái", "fruit", "quỷ", "bán trái", "giá trái", "mua trái", "dough", "dragon", 
+                   "leopard", "tiger", "venom", "buddha", "portal", "control", "spirit", "shadow", "phoenix",
+                   "t-rex", "trex", "mammoth", "yeti", "kitsune", "gas", "blizzard", "rumble", "sound",
+                   "spider", "love", "quake", "magma", "ghost", "creation", "barrier", "rubber", "light",
+                   "diamond", "dark", "sand", "ice", "eagle", "flame", "spike", "smoke", "bomb",
+                   "spring", "blade", "chop", "spin", "rocket", "east dragon", "west dragon", "rồng đông", "rồng tây"]
+        has_fruit = any(w in text.lower() for w in fruit_q)
+        
+        # === GAMEPASS QUERIES === (Ưu tiên cao)
+        gamepass_q = ["gamepass", "2x money", "2x drop", "fast boats", "fruit notifier", 
+                      "dark blade", "mastery", "storage", "scrolls", "boss drops", 
+                      "2x mastery", "legendary scrolls", "mythical scrolls", "+1 fruit"]
+        has_gamepass = any(w in text.lower() for w in gamepass_q)
+        
+        # Nếu có từ khóa giá + fruit/gamepass → ưu tiên fruit/gamepass price
+        price_indicators = ["giá", "bao nhiêu", "bn", "tiền", "mua", "bán", "k", "nghìn", "ngàn"]
+        has_price = any(p in text for p in price_indicators)
+        
+        if has_fruit and has_price:
+            return "ask_fruit_price"
+        
+        if has_gamepass and has_price:
+            return "ask_gamepass_price"
+        
         # === INFO GATHERING ===
-        price_q = ["bao nhiêu", "giá", "bn", "giá sao", "tiền", "k", "ngàn", "nghìn", "đồng"]
-        if any(w in text for w in price_q):
+        if has_price:
             return "ask_price"
         
         quality_q = ["có tốt không", "uy tín", "scam", "lừa", "có thật", "đảm bảo", "bảo hành"]
@@ -248,33 +272,16 @@ class ExpertAI:
         if any(w in text for w in product_q):
             return "ask_product"
         
-        # === FRUIT PRICE QUERIES ===
-        fruit_q = ["trái", "fruit", "quỷ", "bán trái", "giá trái", "mua trái", "dough", "dragon", 
-                   "leopard", "tiger", "venom", "buddha", "portal", "control", "spirit", "shadow", "phoenix",
-                   "t-rex", "trex", "mammoth", "yeti", "kitsune", "gas", "blizzard", "rumble", "sound",
-                   "spider", "love", "quake", "magma", "ghost", "creation", "barrier", "rubber", "light",
-                   "diamond", "dark", "sand", "ice", "eagle", "flame", "spike", "smoke", "bomb",
-                   "spring", "blade", "chop", "spin", "rocket", "east dragon", "west dragon", "rồng đông", "rồng tây"]
-        if any(w in text.lower() for w in fruit_q):
-            # Kiểm tra có phải hỏi giá không
-            price_indicators = ["giá", "bao nhiêu", "bn", "tiền", "mua", "bán", "k", "nghìn", "ngàn"]
-            if any(p in text for p in price_indicators):
-                return "ask_fruit_price"
+        # Nếu chỉ có fruit/gamepass không có giá → hỏi sản phẩm
+        if has_fruit:
+            return "ask_product"
+        
+        if has_gamepass:
             return "ask_product"
         
         image_q = ["ảnh", "hình", "xem", "screenshot", "preview", "chụp", "hình ảnh"]
         if any(w in text for w in image_q):
             return "ask_image"
-        
-        # === GAMEPASS QUERIES ===
-        gamepass_q = ["gamepass", "2x money", "2x drop", "fast boats", "fruit notifier", 
-                      "dark blade", "mastery", "storage", "scrolls", "boss drops", 
-                      "2x mastery", "legendary scrolls", "mythical scrolls", "+1 fruit"]
-        if any(w in text.lower() for w in gamepass_q):
-            price_indicators = ["giá", "bao nhiêu", "bn", "tiền", "mua", "bán"]
-            if any(p in text for p in price_indicators):
-                return "ask_gamepass_price"
-            return "ask_product"
         
         comparison = ["so sánh", "khác nhau", "nên chọn", "con nào", "loại nào", "hơn", "kém"]
         if any(w in text for w in comparison):
