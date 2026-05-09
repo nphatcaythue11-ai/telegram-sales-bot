@@ -1,6 +1,7 @@
 """
 TELEGRAM BOT - CHUYÊN GIA TƯ VẤN BLOX FRUIT GOD LEVEL
 Tư vấn viên: Phát | Hiểu mọi ngôn ngữ | Chốt đơn thần thánh
+Tự động hóa: SePay QR + Webhook + Giao hàng + Admin Panel
 """
 
 import http.client
@@ -10,9 +11,76 @@ import time
 import random
 import threading
 import re
+import urllib.parse
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import Dict, List, Optional
+
+# ========== MODULES MOI ==========
+from database import db
+from sepay import sepay
+from admin import admin_notifier, admin_panel
+
+# ========== PERSONALITY - TINH CACH BOT ==========
+PERSONALITY = {
+    "name": "Phát",
+    "role": "Nhân viên tư vấn bán hàng Blox Fruit",
+    "tone": "Thân thiện, chuyên nghiệp, tự nhiên như người thật",
+    "style": "Ngắn gọn, dễ hiểu, có emoji vừa phải, không máy móc",
+    "rules": [
+        "Luôn đọc toàn bộ ngữ cảnh trước khi trả lời",
+        "Không bỏ sót ý khách hỏi",
+        "Trả lời đúng trọng tâm, không lan man",
+        "Không tự bịa thông tin, không biết thì nói thật",
+        "Không dùng văn mẫu AI, nói như người thật",
+        "Không lặp câu hoặc lặp từ quá nhiều",
+        "Giữ giọng thân thiện, không quá trang trọng, không trẻ con",
+        "Hiểu tiếng Việt không dấu, viết tắt, lóng Gen Z, sai chính tả",
+        "Nếu chưa hiểu thì hỏi lại lịch sự, không hỏi quá nhiều",
+        "Trả lời ngắn gọn dễ hiểu, chia đoạn hợp lý",
+        "Biết tư vấn sản phẩm phù hợp, so sánh rõ ràng",
+        "Upsell tự nhiên, không ép mua, không spam sản phẩm",
+        "Tạo cảm giác thoải mái, giữ khách trong cuộc trò chuyện",
+        "Follow-up nhẹ nhàng, xử lý khách phân vân/mặc cả",
+        "Không giảm giá bừa, không cãi khách, không toxic",
+        "Luôn giữ lịch sự, xin lỗi và cảm ơn tự nhiên",
+        "Xoa dịu khách đang bực, điều chỉnh giọng theo cảm xúc",
+        "Không trả lời cụt ngủn hoặc quá dài",
+        "Hướng dẫn từng bước rõ ràng, không giải thích rối",
+        "Ghi nhớ sản phẩm khách quan tâm, nhớ yêu cầu trước đó",
+        "Xử lý tin nhắn ngắn kiểu 'còn không', 'ib giá', 'shop ơi'",
+        "Phản hồi tự nhiên như Messenger/Telegram, không cứng nhắc",
+        "Không nhắc mình là AI, nói chuyện nhiều lượt tự nhiên",
+        "Ưu tiên hỗ trợ khách có nhu cầu mua, hướng dẫn đặt hàng",
+        "Tạo cảm giác chuyên nghiệp, đáng tin, thiện cảm",
+        "Nói ngắn với khách vội, nói kỹ khi khách cần",
+        "Kết thúc chat lịch sự, mời khách quay lại",
+        "Ưu tiên trải nghiệm khách hàng, giữ vai trò support/sales chuyên nghiệp"
+    ]
+}
+
+# ========== TIN NHẮN TỰ NHIÊN (Natural Responses) ==========
+GREETINGS = [
+    "Dạ em Phát đây ạ! Anh/chị cần tư vấn Blox Fruit gì ạ? 🎮",
+    "Chào anh/chị! Em Phát - bên Blox Fruit. Hôm nay cần gì em hỗ trợ ạ? 😊",
+    "Dạ em nghe! Anh/chị đang quan tâm acc hay trái cây ạ? 🍎",
+    "Shop Phát xin chào anh/chị! Em đây, cần gì cứ hỏi em nhé! 💬",
+    "Em chào! Đang cần tìm acc Blox Fruit phù hợp ạ? Em tư vấn được nè! 👋"
+]
+
+ACKNOWLEDGE_SHORT = [
+    "Dạ em hiểu ạ",
+    "Okie anh/chị",
+    "Em nắm rồi ạ",
+    "Rõ ạ",
+    "Dạ vâng"
+]
+
+ASK_CLARIFY = [
+    "Anh/chị nói thêm giúp em được không ạ? Em chưa hiểu rõ lắm 😅",
+    "Dạ em nghe nhưng chưa rõ lắm. Anh/chị giải thích thêm chút được không ạ?",
+    "Em hiểu khoảng 70% rồi ạ, anh/chị nói thêm giúp em phần còn lại được không? 🙏"
+]
 
 # ========== CONFIG ==========
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
@@ -442,57 +510,34 @@ class ExpertAI:
     # ===== HANDLER FUNCTIONS =====
     
     def _handle_greeting(self, user_id, analysis):
-        """Xử lý chào hỏi"""
+        """Xử lý chào hỏi - Tự nhiên như người thật"""
         emotion = analysis.get("emotion", "neutral")
         
-        responses = {
-            "excited": "👋 *Chào anh/chị!* Em Phát đây! Thấy anh/chị hào hứng quá, chắc là đang muốn sắm acc Blox Fruit xịn đây! 😄",
-            "interested": "👋 *Xin chào!* Em Phát chuyên tư vấn Blox Fruit. Anh/chị đang tìm acc phù hợp phải không ạ?",
-            "casual": "👋 *Chào!* Em Phát đây. Cần tư vấn Blox Fruit gì không ạ?",
-        }
+        # Chọn ngẫu nhiên để không lặp lại
+        import random
+        base = random.choice(GREETINGS)
         
-        msg = responses.get(emotion, "👋 *Chào anh/chị!* Em Phát - chuyên gia Blox Fruit. Anh/chị cần hỗ trợ gì ạ?")
+        # Thêm context theo cảm xúc
+        if emotion == "excited":
+            base += "\n\nThấy anh/chị hào hứng quá, chắc đang muốn sắm acc Blox Fruit xịn đây! Em có acc 6 perm giá 250k nè 😄"
+        elif emotion == "interested":
+            base += "\n\nAnh/chị đang tìm acc hay trái cây ạ? Em có cả hai, giá hợp lý lắm!"
         
         return {
             "type": "text",
-            "content": msg + "\n\n🎮 *CHỈ CÓ 1 LOẠI ACC:*\n🔥 Blox Fruit 6 Perm - 250k\n• Max level 2550\n• 6 gamepass đầy đủ\n• Fruit hiếm\n• KHÔNG có acc 100k, 150k, 300k...\n\nGõ 'xem' hoặc 'giá' để biết thêm!",
+            "content": base + "\n\nNhắn /start để xem menu hoặc hỏi em trực tiếp nhé! 🎮",
             "next_action": None
         }
     
     def _handle_price_inquiry(self, user_id, analysis):
-        """Xử lý hỏi giá - Chỉ có 1 loại acc 250k"""
+        """Xử lý hỏi giá - Giọng tự nhiên như người thật"""
         budget = analysis.get("budget_hint")
         
         # Nếu khách hỏi giá quá thấp (dưới 200k)
         if budget and budget < 200000:
             return {
                 "type": "text",
-                "content": f"""� *XIN LỖI ANH/CHỊ*
-
-Phát **KHÔNG BÁN** acc giá {budget:,}đ ạ.
-
-🚫 *Lý do:*
-• Acc giá rẻ thường bị ban, scam nhiều
-• Không đủ 6 perm, cày rất mệt
-• Không có fruit hiếm
-
-✅ *CHỈ CÓ DUY NHẤT 1 LOẠI ACC:*
-🔥 Blox Fruit 6 Perm - **250.000đ**
-
-📊 *Acc 250k có:*
-• Level Max 2550 (full stats)
-• 6 Gamepass đầy đủ
-• Fruit hiếm (Leopard/Dough/Venom)
-• Beli 50M+, Fragments 50k+
-• Item hiếm: CDK, Soul Guitar
-• Bảo hành 7 ngày
-
-💡 *So với acc rẻ:*
-• Không lo bị ban
-• Vào chơi max ngay
-• Không cần cày 2-3 tuần
-
-Anh/chị có thể lên 250k không ạ? 😊""",
+                "content": f"""Dạ em xin lỗi anh/chị, em không có acc giá {budget:,}đ ạ �\n\nThực ra acc giá rẻ thường dính ban hoặc thiếu perm lắm, khách mua về cày mệt lắm ạ.\n\nEm chỉ có duy nhất 1 loại:\n🔥 **Acc Blox Fruit 6 Perm - 250k**\n\nAcc này đầy đủ 6 perm, max level 2550, có fruit hiếm, CDK, Soul Guitar luôn. Vào chơi max ngay, không cần cày.\n\nAnh/chị có thể lên 250k được không ạ? Em bảo hành 7 ngày đàng hoàng �""",
                 "next_action": "ask_upgrade_budget"
             }
         
@@ -500,59 +545,12 @@ Anh/chị có thể lên 250k không ạ? 😊""",
         if budget and budget >= 300000:
             return {
                 "type": "text",
-                "content": f"""😊 *THÔNG BÁO*
-
-Phát chỉ bán **1 loại acc duy nhất** giá **250.000đ** ạ.
-
-✅ *KHÔNG CÓ* acc giá {budget:,}đ hay cao hơn.
-
-🔥 *ACC CÓ SẴN:* Blox Fruit 6 Perm - 250k
-
-📊 *Trong acc có:*
-• Level Max 2550 (full stats)
-• 6 Gamepass: 2x Money, 2x Drop, Fast Boats, Fruit Notifier, 2x Mastery, God Human
-• Fruit hiếm: Leopard/Dough/Venom
-• Beli 50M+, Fragments 50k+
-• Item hiếm: CDK, Soul Guitar
-• Bảo hành 7 ngày
-
-💡 *Dùng {budget:,}đ mua acc 250k,*
-*số dư còn lại có thể mua thêm trái cây!*
-
-Anh/chị quan tâm acc 250k không? 🎮""",
+                "content": f"""Dạ em chỉ có 1 loại acc duy nhất giá **250k** thôi ạ, không có acc cao hơn đâu �\n\nNhưng nếu anh/chị có {budget:,}đ, mua acc 250k còn dư có thể mua thêm trái cây ạ. Ví dụ:\n\n🍎 Dough: 2,400 RB = {2_400 * FRUIT_RATE:,}đ\n🍎 Leopard: 3,000 RB = {3_000 * FRUIT_RATE:,}đ\n\nCombo acc + trái em giảm 10% nữa! Anh/chị muốn xem combo nào phù hợp không? 🎮""",
                 "next_action": "ask_commitment"
             }
         
         # Giá đúng 250k hoặc không đề cập giá cụ thể
-        msg = f"""💰 *GIÁ ACC BLOX FRUIT*
-
-🎯 *CHỈ CÓ DUY NHẤT 1 LOẠI ACC:*
-🔥 Blox Fruit 6 Perm - **250.000đ**
-
-📊 *Trong acc có:*
-✅ Level Max 2550 (full stats)
-✅ 6 Gamepass đầy đủ:
-   • 2x Money, 2x Drop
-   • Fast Boats, Fruit Notifier
-   • 2x Mastery, God Human
-✅ Fruit hiếm (Leopard/Dough/Venom)
-✅ Beli 50M+, Fragments 50k+
-✅ Item hiếm: CDK, Soul Guitar
-
-🎁 *Quà tặng kèm:*
-• Hướng dẫn chơi
-• Support sau mua
-• Bảo hành 7 ngày
-
-� *KHÔNG CÓ* acc giá khác (100k, 150k, 300k, 500k...)
-
-💡 *Sao nên mua acc 250k?*
-• Không lo bị ban như acc rẻ
-• Tiết kiệm 2-3 tuần cày
-• Vào chơi max ngay
-• Uy tín, bảo hành đầy đủ
-
-Anh/chị chốt acc 250k nhé? 😊"""
+        msg = f"""Dạ em có **1 loại acc duy nhất** giá 250k ạ:\n\n� **Blox Fruit 6 Perm - 250.000đ**\n\nTrong acc có gì ạ:\n• Level Max 2550 - Full stats\n• 6 Perm: 2x Money, 2x Drop, Fast Boats, Fruit Notifier, 2x Mastery, God Human\n• Fruit hiếm: Leopard / Dough / Venom\n• Item hiếm: CDK, Soul Guitar, Valkyrie Helm\n• Beli 50M+, Fragments 50k+\n\n🎁 Tặng kèm: Hướng dẫn chơi + Support sau mua + Bảo hành 7 ngày\n\nEm không có acc giá khác đâu ạ (100k, 150k, 300k gì em không có). Acc 250k này là chuẩn nhất, khách mua về không lo bị ban, vào chơi max ngay luôn.\n\nAnh/chị muốn chốt acc này không ạ? Em hỗ trợ nhiệt tình! 😊"""
 
         return {"type": "text", "content": msg, "next_action": "ask_commitment"}
     
@@ -752,72 +750,18 @@ Gamepass nào anh/chị cần? ⚡"""
         return {"type": "text", "content": msg, "next_action": "ask_gamepass_selection"}
     
     def _handle_trust_objection(self, user_id, analysis):
-        """Xử lý nghi ngờ uy tín"""
+        """Xử lý nghi ngờ uy tín - Thật thà, không flex"""
         return {
             "type": "text",
-            "content": """✅ *VỀ UY TÍN CỦA PHÁT*
-
-📊 *Thông tin shop:*
-• Đã bán 500+ acc thành công
-• Group feedback 1000+ thành viên
-• Hoạt động 2 năm+
-• Rating 4.9/5 ⭐⭐⭐⭐⭐
-
-🛡️ *Cam kết:*
-• Bảo hành 7 ngày đổi trả
-• Hoàn tiền 100% nếu không đúng mô tả
-• Giao acc trong 1-2 phút sau CK
-• Hỗ trợ trọn đời khi chơi
-
-📸 *Minh bạch:*
-• Có video check acc trước khi giao
-• Chụp màn hình giao dịch
-• Info đổi ngay sau thanh toán
-
-💬 *Feedback khách:*
-"Mua 3 acc rồi, uy tín 100%" - Minh A.
-"Giao nhanh, acc đúng mô tả" - Huy B.
-
-Anh/chị yên tâm mua nhé! 🙏""",
+            "content": """Dạ em hiểu anh/chị lo lắng, mua acc online ai cũng sợ bị scam mà 😅\n\nEm nói thật với anh/chị:\n• Em bán acc này lâu rồi, khách quen cũng nhiều\n• Acc em bán là acc chuẩn, không phải acc hack hay acc bị ban\n• Em có bảo hành 7 ngày, nếu không đúng mô tả em hoàn tiền 100%\n• Khách nào mua rồi cũng quay lại mua thêm hoặc giới thiệu bạn\n\nAnh/chị có thể yêu cầu em check acc trước khi giao, quay video cũng được. Em minh bạch lắm, không giấu gì đâu ạ!\n\nNếu vẫn phân vân thì anh/chị cứ theo dõi em thêm, đừng vội mua. Uy tín em xây dựng lâu dài chứ không phải bán 1-2 lần rồi bỏ 🙏""",
             "next_action": "ask_commitment"
         }
     
     def _handle_product_inquiry(self, user_id, analysis):
-        """Xử lý hỏi sản phẩm - Acc, Trái cây, Gamepass"""
+        """Xử lý hỏi sản phẩm - Giọng tư vấn tự nhiên"""
         return {
             "type": "text",
-            "content": f"""🎮 *SHOP PHÁT - BLOX FRUIT*
-
-💎 *1. ACC BLOX FRUIT (DUY NHẤT)*
-📦 Tên: Blox Fruit 6 Perm
-💰 Giá: 250.000đ
-📊 Level: Max 2550
-🍎 Fruit: Leopard/Dough/Venom
-⚡ 6 Perm đầy đủ
-✅ Không có acc giá khác!
-
-🍎 *2. TRÁI CÂY VĨNH VIỄN (PERM)*
-📊 {len(FRUIT_PRICES_RB)} loại trái cây
-💰 Tính giá: RB × {FRUIT_RATE}đ
-🔥 Dough: 2,400 RB = {2_400 * FRUIT_RATE:,}đ
-🔥 Leopard: 3,000 RB = {3_000 * FRUIT_RATE:,}đ
-🔥 Dragon: 5,000 RB = {5_000 * FRUIT_RATE:,}đ
-💡 Nhắn "giá + tên trái" để xem giá
-
-⚡ *3. GAMEPASS*
-📊 {len(GAMEPASS_PRICES_RB)} loại
-💰 Tính giá: RB × {FRUIT_RATE}đ
-🔥 2x Money: 450 RB = {450 * FRUIT_RATE:,}đ
-🔥 Fruit Notifier: 2,700 RB = {2_700 * FRUIT_RATE:,}đ
-🔥 Dark Blade: 1,200 RB = {1_200 * FRUIT_RATE:,}đ
-💡 Nhắn "giá + tên gamepass"
-
-🎯 *Ưu đãi:*
-• Mua acc + trái: Giảm 10%
-• Mua acc + gamepass: Giảm 10%
-• Mua combo: Giảm thêm!
-
-Cần tư vấn gì thêm ạ? �""",
+            "content": f"""Dạ em giới thiệu sơ shop em ạ:\n\n💎 **1. Acc Blox Fruit 6 Perm - 250k** (Duy nhất)\nAcc max level 2550, đầy đủ 6 perm, fruit hiếm. Vào chơi max ngay không cần cày.\n\n🍎 **2. Trái cây vĩnh viễn** ({len(FRUIT_PRICES_RB)} loại)\nTính theo giá Robux × {FRUIT_RATE}đ. Ví dụ:\n• Dough 2,400 RB = {2_400 * FRUIT_RATE:,}đ\n• Leopard 3,000 RB = {3_000 * FRUIT_RATE:,}đ\n• Dragon 5,000 RB = {5_000 * FRUIT_RATE:,}đ\nAnh/chị nhắn "giá + tên trái" em báo chi tiết!\n\n⚡ **3. Gamepass** ({len(GAMEPASS_PRICES_RB)} loại)\nCũng tính RB × {FRUIT_RATE}đ.\n• Fruit Notifier 2,700 RB = {2_700 * FRUIT_RATE:,}đ\n• Dark Blade 1,200 RB = {1_200 * FRUIT_RATE:,}đ\n\n� **Ưu đãi combo:**\nMua acc + trái/gamepass em giảm 10%, combo nhiều giảm thêm!\n\nAnh/chị đang cần loại nào ạ? Em tư vấn chi tiết hơn! 🎮""",
             "next_action": "ask_selection"
         }
     
@@ -847,142 +791,96 @@ Chốt ngay không anh/chị? 💪""",
         
         return {
             "type": "text",
-            "content": """🎉 *TUYỆT VỜI!*
-
-Anh/chị chốt acc Blox Fruit 6 Perm - 450k phải không ạ?
-
-💳 *THANH TOÁN:*
-📱 ZaloPay: `0343603537`
-🏦 BIDV: `8806532434`
-👤 Chủ TK: TRAN NGUYEN PHAT
-
-💰 *Số tiền:* 450.000đ
-
-📌 *Các bước:*
-1️⃣ Chuyển khoản đúng số tiền
-2️⃣ Chụp màn hình gửi Phát
-3️⃣ Nhận acc trong 1-2 phút
-4️⃣ Vào chơi max ngay!
-
-⚡ *Ưu đãi thêm:*
-Nếu CK trong 30 phút tặng thêm 10k belly!
-
-Sẵn sàng chuyển khoản chưa anh/chị? 🚀""",
+            "content": """Tuyệt vời! Anh/chị chốt acc Blox Fruit 6 Perm - 250k đúng không ạ? 🎉\n\n💳 Thông tin thanh toán:\n📱 ZaloPay: `0343603537`\n🏦 BIDV: `8806532434`\n👤 Chủ TK: TRAN NGUYEN PHAT\n\n💰 Số tiền: 250.000đ\n\n📌 Các bước nhận acc:\n1. CK xong chụp màn hình gửi em\n2. Em gửi info acc trong 1-2 phút\n3. Anh/chị đổi pass + email ngay\n4. Em hỗ trợ nếu cần\n\n⚡ Ưu đãi: CK trong 30 phút em tặng thêm hướng dẫn farm belly nhanh!\n\nCó gì không hiểu cứ hỏi em nhé! �""",
             "next_action": "wait_payment"
         }
     
     def _handle_considering(self, user_id, analysis):
-        """Xử lý đang cân nhắc"""
+        """Xử lý đang cân nhắc - Tự nhiên, không ép"""
         objections = analysis.get("objections", [])
         
-        msg = """🤔 *Em hiểu anh/chị đang cân nhắc...*
-
-💡 *Để em giúp anh/chị quyết định:*
-
-✨ *So với tự cày:*
-• Cày lên 2550 mất 2-3 tuần
-• Roll 6 perm tốn 500k+
-• Roll fruit hiếm tốn 200k+
-• = Tổng cộng 700k+ và 1 tháng
-
-💰 *Mua acc 450k:*
-• Có ngay acc max
-• Tiết kiệm 250k+
-• Tiết kiệm 1 tháng cày
-• Vào chơi được luôn
-
-🎁 *Thêm nữa:*
-• Bảo hành 7 ngày
-• Hoàn tiền nếu không đúng
-• Support trọn đời
-
-Còn phân vân điều gì không ạ? Em giải đáp ngay! 😊"""
+        msg = """Dạ em hiểu anh/chị đang cân nhắc, không sao đâu ạ 😊\n\nEm chia sẻ thực tế để anh/chị dễ quyết định:\n\n💪 Tự cày từ đầu:\n• Cày lên 2550 mất 2-3 tuần chơi liên tục\n• Roll 6 perm tốn khoảng 500k+\n• Roll fruit hiếm thêm 200k+\n• Tổng hết ~700k và cả tháng cày mệt\n\n� Mua acc 250k của em:\n• Có ngay acc max, vào chơi luôn\n• Tiết kiệm hơn 450k so với tự làm\n• Không mất thời gian cày\n• Được bảo hành 7 ngày + support sau mua\n\nAnh/chị còn phân vân điều gì không ạ? Em giải đáp thoải mái, không ép mua đâu! �"""
 
         if "price" in objections:
-            msg += "\n\n💵 *Về giá 450k:*\nGiá này đã rẻ hơn thị trường 100k rồi ạ. Acc max 6 perm thường bán 550k-600k đó!"
+            msg += "\n\n💵 Về giá 250k ạ, em bán giá này là hòa vốn thôi. Acc max 6 perm bên ngoài người ta bán 400-500k đó. Em lấy uy tín làm đầu nên giữ giá ổn định cho khách quen!"
         
         return {"type": "text", "content": msg, "next_action": "address_objections"}
     
     def _handle_negotiation(self, user_id, analysis):
-        """Xử lý trả giá"""
+        """Xử lý trả giá - Không giảm bừa, tặng quà thay"""
         return {
             "type": "text",
-            "content": """💰 *VỀ GIÁ 450K*
-
-Em hiểu anh/chị muốn giá tốt hơn 😊
-
-📊 *Thực tế:*
-• Acc max 6 perm thị trường bán 550k-600k
-• Em bán 450k đã rẻ hơn 100k+
-• Giá này chỉ hòa vốn, không lãi nhiều
-
-🎁 *Em có thể tặng thêm:*
-• 50k belly trong game
-• Hướng dẫn farm nhanh
-• Tips đi boss hiệu quả
-
-⚡ *Nếu mua ngay hôm nay:*
-Giữ giá 450k + tặng thêm quà!
-
-Anh/chị chốt để em chuẩn bị acc nhé? 💪""",
+            "content": """Dạ em hiểu anh/chị muốn giá tốt hơn 😊\n\nThật ra em bán 250k là giá hòa vốn rồi ạ. Em không giảm thêm được vì acc max 6 perm này em cũng phải đầu tư công sức kiếm. Bên ngoài người ta bán 400-500k đó ạ.\n\nNhưng em có thể tặng thêm cho anh/chị:\n🎁 Hướng dẫn farm belly nhanh\n🎁 Tips đi boss lấy item hiếm\n🎁 Support nhiệt tình sau mua, có gì cứ hỏi em\n\nGiá 250k + quà tặng kèm + bảo hành 7 ngày, anh/chị thấy ổn không ạ? Em chuẩn bị acc đẹp cho! �""",
             "next_action": "soft_close"
         }
     
     def _handle_objection(self, user_id, analysis):
-        """Xử lý từ chối"""
+        """Xử lý từ chối - Tôn trọng, không ép, mời quay lại"""
         return {
             "type": "text",
-            "content": """😔 *Em hiểu anh/chị chưa muốn mua ngay...*
-
-*Không sao ạ!* 😊
-
-📌 *Em lưu lại thông tin:*
-• Acc Blox Fruit 6 Perm - 450k
-• Còn {THE_ACCOUNT['stock']} acc
-
-🎁 *Nếu đổi ý trong 24h:*
-Em vẫn giữ giá 450k + ưu đãi!
-
-💬 *Cần tư vấn gì thêm:*
-Cứ nhắn Phát bất cứ lúc nào nhé!
-
-Cảm ơn anh/chị đã quan tâm! 🙏""",
+            "content": """Dạ không sao đâu ạ 😊 Anh/chị cứ suy nghĩ thoải mái, em không ép mua đâu!\n\nEm chỉ lưu lại thông tin để anh/chị cần thì liên hệ:\n💎 Acc Blox Fruit 6 Perm - 250k\n📦 Còn {THE_ACCOUNT['stock']} acc\n\nNếu đổi ý trong 24h em vẫn giữ giá + ưu đãi như cũ ạ. Còn nếu không mua cũng không sao, em vẫn sẵn sàng tư vấn nếu anh/chị cần!\n\nCảm ơn anh/chị đã dành thời gian chat với em nhé! 🙏""",
             "next_action": "follow_up_later"
         }
     
     def _handle_thanks(self, user_id, analysis):
-        """Xử lý cảm ơn"""
+        """Xử lý cảm ơn - Tự nhiên, ấm áp"""
+        import random
+        responses = [
+            "Dạ không có gì đâu ạ! Anh/chị cần gì cứ nhắn em, em luôn sẵn sàng hỗ trợ! Chúc anh/chị một ngày vui vẻ 🎮😊",
+            "Em cảm ơn anh/chị đã tin tưởng ạ! Có gì cứ tìm em, em Phát luôn ở đây! 👋",
+            "Không có chi đâu ạ! Anh/chị vui là em vui rồi. Cần gì thêm cứ alo em nhé! 💬"
+        ]
         return {
             "type": "text",
-            "content": """🙏 *Không có gì đâu anh/chị!*
-
-Em Phát luôn sẵn sàng hỗ trợ! 
-
-💬 *Cần gì cứ nhắn:*
-• Tư vấn chơi Blox Fruit
-• Hỗ trợ kỹ thuật
-• Mua thêm acc/dịch vụ
-
-Chúc anh/chị chơi game vui vẻ! 🎮
-
-*Phát - Chuyên gia Blox Fruit* 😊""",
+            "content": random.choice(responses),
             "next_action": None
         }
     
     def _handle_general(self, user_id, analysis, text):
-        """Xử lý chung - AI linh hoạt"""
+        """Xử lý chung - Tự nhiên, hỏi lại lịch sự, không bỏ sót ý"""
         emotion = analysis.get("emotion", "neutral")
         style = analysis.get("style", "neutral")
+        text_lower = text.lower()
         
-        # Phản hồi thông minh dựa trên ngữ cảnh
+        # Xử lý tin nhắn ngắn đặc biệt
+        short_msgs = {
+            "shop ơi": "Dạ em nghe! Anh/chị cần gì ạ? Em có acc Blox Fruit 250k và trái cây vĩnh viễn! 🎮",
+            "shop oi": "Dạ em nghe! Anh/chị cần gì ạ? Em có acc Blox Fruit 250k và trái cây vĩnh viễn! 🎮",
+            "ib giá": "Dạ em đây! Acc Blox Fruit 6 Perm giá 250k ạ. Anh/chị muốn biết thêm chi tiết gì không? �",
+            "ib gia": "Dạ em đây! Acc Blox Fruit 6 Perm giá 250k ạ. Anh/chị muốn biết thêm chi tiết gì không? 😊",
+            "còn không": "Dạ em còn ạ! Acc Blox Fruit 6 Perm 250k vẫn còn hàng. Anh/chị quan tâm không? 💎",
+            "con khong": "Dạ em còn ạ! Acc Blox Fruit 6 Perm 250k vẫn còn hàng. Anh/chị quan tâm không? 💎",
+            "alo": "Dạ em nghe! Shop Phát đây, anh/chị cần gì em hỗ trợ ạ? 👋",
+            "ei": "Dạ em đây! Cần gì cứ nói em nhé! 🎮",
+            "bro": "Dạ em nghe bro! Cần tư vấn Blox Fruit gì không? 🔥",
+            "help": "Dạ em đây! Anh/chị cần hỗ trợ gì ạ? Em có acc 250k, trái cây, gamepass... 🆘",
+        }
+        
+        for key, response in short_msgs.items():
+            if key in text_lower or text_lower == key:
+                return {"type": "text", "content": response, "next_action": "ask_needs"}
+        
+        # Xử lý theo cảm xúc
+        if emotion == "angry":
+            return {
+                "type": "text",
+                "content": "Dạ em xin lỗi nếu có gì làm anh/chị không vui ạ. Anh/chị nói rõ hơn để em hỗ trợ được không? Em sẽ cố gắng giải quyết ngay! 🙏",
+                "next_action": "calm_down"
+            }
+        
+        if emotion == "excited":
+            return {
+                "type": "text",
+                "content": "Dạ em thấy anh/chị hào hứng quá! 😄 Anh/chị đang quan tâm acc Blox Fruit 250k hay trái cây nào ạ? Em tư vấn nhiệt tình!",
+                "next_action": "ask_product"
+            }
+        
+        # Phản hồi chung - tự nhiên
         responses = [
-            "Em Phát chưa hiểu ý anh/chị lắm 😅 Anh/chị muốn tìm hiểu về acc Blox Fruit 450k hay cần hỗ trợ gì ạ?",
-            
-            "Dạ em chưa rõ lắm... Anh/chị có thể nói rõ hơn không ạ? Ví dụ: 'giá bao nhiêu', 'có ảnh không', 'muốn mua'...",
-            
-            "Em đang lắng nghe anh/chị đây! 😊 Anh/chị cần tư vấn Blox Fruit gì ạ? Acc 450k 6 perm đang hot lắm!",
-            
-            f"Hihi em chưa hiểu ý anh/chị {'ạ' if style == 'polite' else ''} 😄 Anh/chị muốn xem acc Blox Fruit không? Gõ 'xem' hoặc 'ảnh' nhé!",
+            "Dạ em chưa hiểu rõ ý anh/chị lắm � Anh/chị đang cần tìm hiểu acc Blox Fruit 250k, hay trái cây, hay gamepass ạ?",
+            "Em nghe nhưng chưa rõ lắm... Anh/chị nói thêm chút được không ạ? Ví dụ 'giá acc', 'giá Dough', 'muốn mua'... 💬",
+            "Dạ em đang lắng nghe anh/chị đây! Anh/chị cần gì cứ hỏi em nhé, em có acc 250k và đủ loại trái cây! 🎮",
+            f"{'Dạ' if style == 'polite' else 'Dạo'} em chưa bắt kịp ý anh/chị {'ạ' if style == 'polite' else ''} 😄 Anh/chị muốn xem sản phẩm gì? Nhắn /start để xem menu nha!",
         ]
         
         return {
@@ -1046,57 +944,403 @@ def get_updates(offset=0):
         print(f"❌ Lỗi get updates: {e}")
         return None
 
-# ========== KEEP ALIVE ==========
-class KeepAliveHandler(BaseHTTPRequestHandler):
+# ========== TELEGRAM KEYBOARD HELPERS ==========
+def send_keyboard(chat_id, text, buttons):
+    """Gui tin nhan co inline keyboard"""
+    try:
+        conn = http.client.HTTPSConnection("api.telegram.org")
+        payload = json.dumps({
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": "Markdown",
+            "reply_markup": {"inline_keyboard": buttons},
+            "disable_web_page_preview": True
+        })
+        headers = {"Content-type": "application/json"}
+        conn.request("POST", f"/bot{TELEGRAM_TOKEN}/sendMessage", payload, headers)
+        resp = conn.getresponse()
+        result = json.loads(resp.read().decode())
+        conn.close()
+        return result
+    except Exception as e:
+        print(f"❌ Lỗi gửi keyboard: {e}")
+        return None
+
+def edit_message_text(chat_id, message_id, text, buttons=None):
+    """Sua noi dung tin nhan + keyboard"""
+    try:
+        conn = http.client.HTTPSConnection("api.telegram.org")
+        payload = {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "text": text,
+            "parse_mode": "Markdown",
+            "disable_web_page_preview": True
+        }
+        if buttons:
+            payload["reply_markup"] = {"inline_keyboard": buttons}
+        body = json.dumps(payload)
+        headers = {"Content-type": "application/json"}
+        conn.request("POST", f"/bot{TELEGRAM_TOKEN}/editMessageText", body, headers)
+        conn.close()
+    except Exception as e:
+        print(f"❌ Lỗi edit msg: {e}")
+
+def answer_callback(callback_id, text=""):
+    """Tra loi callback query (hieu ung nhan nut)"""
+    try:
+        conn = http.client.HTTPSConnection("api.telegram.org")
+        payload = json.dumps({"callback_query_id": callback_id, "text": text})
+        headers = {"Content-type": "application/json"}
+        conn.request("POST", f"/bot{TELEGRAM_TOKEN}/answerCallbackQuery", payload, headers)
+        conn.close()
+    except:
+        pass
+
+# ========== MENU KEYBOARDS ==========
+def get_main_menu():
+    """Menu chinh"""
+    return [
+        [{"text": "🎮 Xem sản phẩm", "callback_data": "menu_products"},
+         {"text": "🛒 Mua hàng", "callback_data": "menu_buy"}],
+        [{"text": "💰 Kiểm tra đơn", "callback_data": "menu_orders"},
+         {"text": "📜 Lịch sử mua", "callback_data": "menu_history"}],
+        [{"text": "❓ Hỗ trợ / FAQ", "callback_data": "menu_support"}]
+    ]
+
+def get_products_menu():
+    """Menu san pham"""
+    return [
+        [{"text": "💎 Acc Blox Fruit 250k", "callback_data": "buy_acc"}],
+        [{"text": "🍎 Trái cây vĩnh viễn", "callback_data": "menu_fruits"}],
+        [{"text": "⚡ Gamepass", "callback_data": "menu_gamepass"}],
+        [{"text": "⬅️ Quay lại", "callback_data": "menu_main"}]
+    ]
+
+def get_buy_confirm_menu(order_id: int):
+    """Menu xac nhan mua + thanh toan"""
+    return [
+        [{"text": "💳 Thanh toán QR", "callback_data": f"pay_qr_{order_id}"}],
+        [{"text": "❌ Hủy đơn", "callback_data": f"cancel_{order_id}"}]
+    ]
+
+# ========== ORDER & PAYMENT FLOW ==========
+def create_order_flow(user_id: int, product_type: str, product_name: str,
+                       product_detail: str, amount: int) -> int:
+    """Tao don hang va tra ve order_id"""
+    payment_content = sepay.generate_payment_content(0, user_id)
+    order_id = db.create_order(user_id, product_type, product_name,
+                                product_detail, amount, payment_content)
+    # Update payment content with real order_id
+    payment_content = sepay.generate_payment_content(order_id, user_id)
+    conn = db._connect()
+    c = conn.cursor()
+    c.execute('UPDATE orders SET payment_content = ? WHERE order_id = ?',
+              (payment_content, order_id))
+    conn.commit()
+    conn.close()
+    return order_id
+
+def send_payment_qr(chat_id: int, order_id: int):
+    """Gui QR thanh toan cho khach"""
+    order = db.get_order(order_id)
+    if not order:
+        send_message(chat_id, "❌ Không tìm thấy đơn hàng.")
+        return
+    
+    if not sepay.is_configured():
+        # Fallback: chi hien thong tin CK
+        msg = f"""🛒 *ĐƠN HÀNG #{order_id}*
+
+📦 *Sản phẩm:* {order['product_name']}
+💰 *Số tiền:* {order['amount']:,}đ
+🏦 *Nội dung CK:* `{order['payment_content']}`
+
+{sepay.get_bank_info_text()}
+
+⚠️ *Quan trọng:* Dùng đúng nội dung trên để bot tự động xác nhận!
+
+⏳ Đơn sẽ tự động xác nhận sau khi nhận được chuyển khoản.
+💬 Nếu cần hỗ trợ: {SHOP_CONTACT}"""
+        send_message(chat_id, msg)
+        return
+    
+    qr_url = sepay.generate_qr_url(order['amount'], order['payment_content'])
+    
+    msg = f"""🛒 *ĐƠN HÀNG #{order_id}*
+
+📦 *Sản phẩm:* {order['product_name']}
+📋 *Chi tiết:* {order['product_detail'][:50]}
+💰 *Số tiền:* {order['amount']:,}đ
+🏦 *Nội dung CK:* `{order['payment_content']}`
+
+📲 *Quét QR để thanh toán:*
+(Hoặc chuyển khoản thủ công với đúng nội dung)
+
+⏳ Sau khi thanh toán, bot sẽ tự động giao hàng trong 1-2 phút.
+💬 Cần hỗ trợ: {SHOP_CONTACT}"""
+    
+    # Gui QR anh
+    try:
+        conn = http.client.HTTPSConnection("api.telegram.org")
+        payload = json.dumps({
+            "chat_id": chat_id,
+            "photo": qr_url,
+            "caption": msg,
+            "parse_mode": "Markdown"
+        })
+        headers = {"Content-type": "application/json"}
+        conn.request("POST", f"/bot{TELEGRAM_TOKEN}/sendPhoto", payload, headers)
+        conn.close()
+    except Exception as e:
+        print(f"❌ Lỗi gửi QR: {e}")
+        send_message(chat_id, msg + f"\n\n🔗 *QR Link:* {qr_url}")
+
+def process_payment(order_id: int, tx_amount: int, tx_content: str) -> bool:
+    """Xu ly thanh toan tu webhook"""
+    order = db.get_order(order_id)
+    if not order:
+        print(f"⚠️ Order {order_id} không tồn tại")
+        return False
+    
+    if order['status'] != 'pending':
+        print(f"⚠️ Order {order_id} đã được xử lý ({order['status']})")
+        return False
+    
+    # Kiem tra so tien (cho phep sai lech nho)
+    if tx_amount < order['amount'] - 1000:
+        print(f"⚠️ Số tiền không đủ: {tx_amount} < {order['amount']}")
+        return False
+    
+    # Xac nhan thanh toan
+    now = datetime.now().isoformat()
+    db.update_order_status(order_id, 'paid', now)
+    
+    customer = db.get_customer(order['user_id'])
+    tx_data = {'transaction_id': tx_content, 'amount': tx_amount, 'content': tx_content}
+    
+    # Thong bao admin
+    admin_notifier.send_payment_confirmation(order, customer or {}, tx_data)
+    
+    # Auto giao hang
+    auto_deliver(order_id)
+    
+    return True
+
+def auto_deliver(order_id: int):
+    """Tu dong giao hang"""
+    order = db.get_order(order_id)
+    if not order:
+        return
+    
+    product_type = order['product_type']
+    product_name = order['product_name']
+    user_id = order['user_id']
+    
+    # Lay stock
+    stock = db.get_available_stock(product_type, product_name)
+    
+    if stock:
+        # Giao hang tu stock
+        delivery_content = stock['content']
+        db.mark_stock_sold(stock['stock_id'], order_id)
+        db.record_delivery(order_id, delivery_content)
+        
+        # Gui cho khach
+        msg = f"""🎉 *THANH TOÁN THÀNH CÔNG!*
+
+✅ Đơn #{order_id} đã được xác nhận.
+
+🎁 *THÔNG TIN GIAO HÀNG:*
+`{delivery_content}`
+
+⚠️ *Lưu ý:*
+• Đổi mật khẩu ngay sau khi nhận
+• Không chia sẻ thông tin cho người khác
+• Có vấn đề liên hệ {SHOP_CONTACT}
+
+🙏 Cảm ơn anh/chị đã tin tưởng Phát!
+Để lại feedback giúp em nhé 🌟"""
+        send_message(user_id, msg)
+        
+        # Thong bao admin giao hang xong
+        customer = db.get_customer(user_id)
+        admin_notifier.send_delivery_notification(order, customer or {})
+    else:
+        # Het hang
+        db.update_order_status(order_id, 'out_of_stock')
+        msg = f"""😔 *XIN LỖI ANH/CHỊ*
+
+Đơn #{order_id} đã thanh toán thành công nhưng **hết hàng**!
+
+💰 Số tiền {order['amount']:,}đ sẽ được hoàn lại trong 24h.
+Hoặc anh/chị có thể đổi sang sản phẩm khác.
+
+💬 Liên hệ {SHOP_CONTACT} để được hỗ trợ ngay."""
+        send_message(user_id, msg)
+        admin_notifier.send_low_stock_alert(product_type, product_name)
+
+# ========== WEBHOOK HANDLER ==========
+class WebhookHandler(BaseHTTPRequestHandler):
+    """Xu ly keep-alive + SePay webhook"""
+    
     def do_GET(self):
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
-        self.wfile.write(b"<h1>Phat Bot - God Level AI Running!</h1>")
-    def log_message(self, *args): pass
+        self.wfile.write(b"<h1>Phat Bot - God Level AI + Auto Payment Running!</h1>")
+    
+    def do_POST(self):
+        path = self.path
+        
+        # SePay webhook
+        if path == '/webhook/sepay':
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length)
+            
+            # Xac thuc signature (neu co secret)
+            signature = self.headers.get('X-Sepay-Signature', '')
+            if sepay.webhook_secret and not sepay.verify_webhook(body, signature):
+                self.send_response(401)
+                self.end_headers()
+                self.wfile.write(b'Unauthorized')
+                print("❌ Webhook signature không hợp lệ")
+                return
+            
+            try:
+                data = json.loads(body.decode('utf-8'))
+                tx = sepay.parse_transaction(data)
+                if tx and tx['transfer_type'] == 'in':
+                    order_id = sepay.extract_order_from_content(tx['content'])
+                    if order_id:
+                        success = process_payment(order_id, tx['amount'], tx['content'])
+                        print(f"✅ Webhook: Order {order_id} processed: {success}")
+                        self.send_response(200)
+                        self.end_headers()
+                        self.wfile.write(b'OK')
+                        return
+                    else:
+                        print(f"⚠️ Không tìm thấy order_id trong: {tx['content']}")
+                else:
+                    print(f"⚠️ Giao dịch không hợp lệ hoặc không phải chuyển vào")
+            except Exception as e:
+                print(f"❌ Lỗi xử lý webhook: {e}")
+                admin_notifier.send_error_alert(f"Webhook error: {e}")
+            
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b'OK')
+            return
+        
+        # Default
+        self.send_response(404)
+        self.end_headers()
+        self.wfile.write(b'Not Found')
+    
+    def log_message(self, format, *args):
+        pass
 
-def start_keep_alive():
+def start_server():
     port = int(os.environ.get('PORT', 10000))
-    server = HTTPServer(('0.0.0.0', port), KeepAliveHandler)
-    print(f"✅ Server port {port}")
+    server = HTTPServer(('0.0.0.0', port), WebhookHandler)
+    print(f"✅ Server port {port} (Keep-alive + Webhook)")
     server.serve_forever()
 
 # ========== MESSAGE HANDLER ==========
 def handle_message(msg):
     chat_id = msg['chat']['id']
     user_id = msg['from']['id']
+    username = msg['from'].get('username', '')
     user_name = msg['from'].get('first_name', 'Bạn')
     text = msg.get('text', '')
     
     if not text:
         return
     
+    # Luu khach hang vao DB
+    db.add_customer(user_id, username, user_name, msg['from'].get('last_name', ''))
+    db.log_message(user_id, text)
+    
+    # Spam protection
+    msg_count = db.get_message_count_last_minute(user_id)
+    if msg_count > 15:
+        send_message(chat_id, "⏳ Anh/chị nhắn hơi nhanh rồi. Đợi em xíu nhé! 😅")
+        return
+    
     print(f"📨 [{datetime.now().strftime('%H:%M:%S')}] {user_name}: {text[:50]}")
     
-    # Commands
+    # ========== ADMIN COMMANDS ==========
+    if admin_panel.is_admin(user_id):
+        if text.startswith('/don'):
+            if len(text.split()) > 1:
+                try:
+                    oid = int(text.split()[1])
+                    order = db.get_order(oid)
+                    if order:
+                        cus = db.get_customer(order['user_id'])
+                        msg_admin = f"""� *CHI TIẾT ĐƠN #{oid}*
+
+👤 Khách: {cus.get('first_name','N/A')} (@{cus.get('username','N/A')})
+🆔 ID: `{order['user_id']}`
+📦 SP: {order['product_name']}
+📋 Chi tiết: {order['product_detail'][:100]}
+💰 Tiền: {order['amount']:,}đ
+🏦 Nội dung: `{order['payment_content']}`
+🕒 Tạo: {order['created_at'][:16]}
+✅ Trạng thái: {order['status'].upper()}"""
+                        send_message(chat_id, msg_admin)
+                    else:
+                        send_message(chat_id, "❌ Không tìm thấy đơn.")
+                except ValueError:
+                    send_message(chat_id, "❌ Dùng: /don <order_id>")
+            else:
+                orders = db.get_all_orders(30)
+                send_message(chat_id, admin_panel.format_order_list(orders))
+            return
+        
+        if text == '/doanhthu':
+            stats = db.get_revenue()
+            send_message(chat_id, admin_panel.format_revenue(stats))
+            return
+        
+        if text.startswith('/nhaphang'):
+            parts = text.split(' ', 2)
+            if len(parts) >= 3:
+                ptype = parts[1]
+                pname = parts[2]
+                # Them stock voi noi dung mac dinh (admin nhap sau)
+                db.add_stock(ptype, pname, f"STOCK_{ptype}_{datetime.now().timestamp()}")
+                send_message(chat_id, f"✅ Đã thêm stock: {pname} ({ptype})")
+            else:
+                send_message(chat_id, "❌ Dùng: /nhaphang <loai> <ten>\nVD: /nhaphang acc BloxFruit")
+            return
+        
+        if text == '/tonkho':
+            count = db.get_stock_count()
+            send_message(chat_id, admin_panel.format_stock_status(count))
+            return
+        
+        if text == '/admin':
+            send_message(chat_id, """🔧 *ADMIN PANEL*
+
+📋 /don - Xem danh sách đơn
+📋 /don <id> - Chi tiết đơn
+💰 /doanhthu - Thống kê doanh thu
+📦 /tonkho - Xem tồn kho
+📥 /nhaphang <loại> <tên> - Nhập hàng
+
+🤖 Bot vẫn hoạt động bình thường.""")
+            return
+    
+    # ========== USER COMMANDS ==========
     if text == '/start':
-        send_message(chat_id, f"""👋 *Chào {user_name}!*
+        menu_text = f"""👋 *Chào {user_name}!*
 
-🤖 Em là *Phát* - Chuyên gia Blox Fruit **GOD LEVEL**
-📊 Tính giá: RB × Tỷ lệ = Giá VNĐ
+� Em là *Phát* - Chuyên gia Blox Fruit
 
-🔥 *SẢN PHẨM:*
-💎 Acc 6 Perm - *250.000đ* (DUY NHẤT)
-🍎 {len(FRUIT_PRICES_RB)} loại trái cây
-⚡ {len(GAMEPASS_PRICES_RB)} loại Gamepass
-
-💡 *Cách hỏi giá:*
-• "giá Dough" | "giá Leopard" | "giá Kitsune"
-• "giá 2x Money" | "giá Fruit Notifier"
-• "giá trái" - Xem tất cả trái
-• "giá gamepass" - Xem tất cả GP
-
-⚙️ *Lệnh:*
-• /tyle 150 - Đổi tỷ lệ RB
-• /trai - Bảng giá trái
-• /gamepass - Bảng giá GP
-
-🧠 Em hiểu mọi ngôn ngữ: "dough bn", "trái rồng giá sao" 😊""")
+🔥 *MENU CHÍNH:*
+Chọn nút bên dưới để sử dụng!"""
+        send_keyboard(chat_id, menu_text, get_main_menu())
         return
     
     # Lệnh xem/chỉnh tỷ lệ giá
@@ -1140,28 +1384,196 @@ def handle_message(msg):
     
     print(f"✅ Đã trả lời ({response.get('next_action', 'none')})")
 
+
+# ========== CALLBACK HANDLER (INLINE KEYBOARD) ==========
+def handle_callback(update):
+    """Xu ly nhan nut inline keyboard"""
+    callback = update.get('callback_query', {})
+    if not callback:
+        return
+    
+    callback_id = callback.get('id', '')
+    data = callback.get('data', '')
+    msg = callback.get('message', {})
+    chat_id = msg.get('chat', {}).get('id', 0)
+    message_id = msg.get('message_id', 0)
+    user_id = callback.get('from', {}).get('id', 0)
+    user_name = callback.get('from', {}).get('first_name', 'Bạn')
+    
+    # Luu khach
+    db.add_customer(user_id, callback['from'].get('username', ''),
+                    user_name, callback['from'].get('last_name', ''))
+    
+    print(f"🔘 [{datetime.now().strftime('%H:%M:%S')}] {user_name} clicked: {data}")
+    answer_callback(callback_id)
+    
+    # === MENU NAVIGATION ===
+    if data == "menu_main":
+        text = f"👋 *Chào {user_name}!*\n\nChọn chức năng bên dưới:"
+        edit_message_text(chat_id, message_id, text, get_main_menu())
+        return
+    
+    if data == "menu_products":
+        text = """🎮 *SẢN PHẨM*
+
+Chọn loại sản phẩm:"""
+        edit_message_text(chat_id, message_id, text, get_products_menu())
+        return
+    
+    if data == "menu_buy":
+        text = f"""🛒 *MUA HÀNG*
+
+📦 Chọn sản phẩm để đặt:
+
+💎 Acc Blox Fruit - 250k
+🍎 Trái cây vĩnh viễn
+⚡ Gamepass"""
+        edit_message_text(chat_id, message_id, text, get_products_menu())
+        return
+    
+    if data == "menu_orders":
+        pending = db.get_pending_order(user_id)
+        orders = db.get_customer_orders(user_id)
+        if not orders:
+            text = "📭 Anh/chị chưa có đơn hàng nào.\n\n🛒 Chọn 'Mua hàng' để đặt đơn đầu tiên!"
+            edit_message_text(chat_id, message_id, text, get_main_menu())
+            return
+        
+        lines = ["📋 *ĐƠN HÀNG CỦA BẠN*\n"]
+        for o in orders[:10]:
+            status = {'pending': '⏳ Chờ TT', 'paid': '💰 Đã TT',
+                      'completed': '✅ Hoàn tất', 'cancelled': '❌ Đã hủy',
+                      'out_of_stock': '🚫 Hết hàng'}
+            lines.append(f"#{o['order_id']} | {o['product_name'][:15]} | {o['amount']:,}đ | {status.get(o['status'], o['status'])}")
+        
+        text = '\n'.join(lines)
+        edit_message_text(chat_id, message_id, text, get_main_menu())
+        return
+    
+    if data == "menu_history":
+        orders = db.get_customer_orders(user_id)
+        completed = [o for o in orders if o['status'] == 'completed']
+        if not completed:
+            text = "📜 Chưa có lịch sử giao dịch.\n\n🛒 Mua hàng để bắt đầu nhé!"
+        else:
+            lines = ["📜 *LỊCH SỬ MUA*\n"]
+            total = sum(o['amount'] for o in completed)
+            for o in completed[:10]:
+                lines.append(f"✅ #{o['order_id']} | {o['product_name'][:20]} | {o['amount']:,}đ")
+            lines.append(f"\n💰 Tổng chi: {total:,}đ")
+            text = '\n'.join(lines)
+        edit_message_text(chat_id, message_id, text, get_main_menu())
+        return
+    
+    if data == "menu_support":
+        text = f"""❓ *HỖ TRỢ / FAQ*
+
+💬 Liên hệ trực tiếp: {SHOP_CONTACT}
+
+🔥 *Câu hỏi thường gặp:*
+
+❓ *Làm sao mua?*
+→ Chọn "Mua hàng" > Chọn sản phẩm > Thanh toán QR > Bot tự giao hàng
+
+❓ *Thanh toán như thế nào?*
+→ Chuyển khoản qua QR SePay hoặc CK thủ công
+
+❓ *Bao lâu nhận hàng?*
+→ 1-2 phút sau khi thanh toán (tự động)
+
+❓ *Có bảo hành không?*
+→ Có, 7 ngày đổi trả nếu lỗi
+
+❓ *Acc có bị ban không?*
+→ Acc chuẩn, không lo bị ban như acc rẻ
+
+❓ *Mua trái cây có nhận ngay không?*
+→ Có, bot giao tự động sau khi thanh toán
+
+💡 Cần hỗ trợ thêm? Nhắn trực tiếp cho em!"""
+        edit_message_text(chat_id, message_id, text, get_main_menu())
+        return
+    
+    if data == "menu_fruits":
+        # Hien bang gia trai
+        response = god_ai._handle_fruit_price(user_id, {}, "giá trái")
+        send_message(chat_id, response["content"])
+        return
+    
+    if data == "menu_gamepass":
+        response = god_ai._handle_gamepass_price(user_id, {}, "giá gamepass")
+        send_message(chat_id, response["content"])
+        return
+    
+    # === BUY ACTIONS ===
+    if data == "buy_acc":
+        if THE_ACCOUNT['stock'] <= 0:
+            send_message(chat_id, "😔 Xin lỗi, hiện tại hết hàng acc. Vui lòng quay lại sau!")
+            return
+        
+        order_id = create_order_flow(
+            user_id, 'acc', THE_ACCOUNT['name'],
+            f"Acc {THE_ACCOUNT['name']} - Level {THE_ACCOUNT['level']} - {THE_ACCOUNT['fruit']}",
+            THE_ACCOUNT['price']
+        )
+        
+        order = db.get_order(order_id)
+        customer = db.get_customer(user_id)
+        admin_notifier.send_order_notification(order, customer or {})
+        
+        text = f"""🛒 *ĐƠN HÀNG #{order_id} ĐÃ TẠO*
+
+📦 *Sản phẩm:* {THE_ACCOUNT['name']}
+💰 *Giá:* {THE_ACCOUNT['price']:,}đ
+🏦 *Nội dung CK:* `{order['payment_content']}`
+
+👉 Chọn "Thanh toán QR" để nhận mã QR
+💬 Hoặc CK thủ công với đúng nội dung trên
+
+⏳ Sau khi thanh toán, bot tự động giao hàng!"""
+        send_keyboard(chat_id, text, get_buy_confirm_menu(order_id))
+        return
+    
+    # === PAYMENT ACTIONS ===
+    if data.startswith("pay_qr_"):
+        order_id = int(data.split("_")[2])
+        send_payment_qr(chat_id, order_id)
+        return
+    
+    if data.startswith("cancel_"):
+        order_id = int(data.split("_")[1])
+        db.update_order_status(order_id, 'cancelled')
+        text = f"❌ Đơn #{order_id} đã bị hủy.\n\n🛒 Chọn lại sản phẩm nếu cần nhé!"
+        edit_message_text(chat_id, message_id, text, get_main_menu())
+        return
+    
+    # Mac dinh
+    send_message(chat_id, "🤔 Em chưa hiểu. Anh/chị chọn lại trong menu nhé!")
+
 # ========== MAIN ==========
 last_update_id = 0
 
 def main():
     print("=" * 60)
-    print("🤖 PHAT BOT - GOD LEVEL AI (MAX INTELLIGENCE)")
+    print("🤖 PHAT BOT - GOD LEVEL AI + AUTO PAYMENT")
     print("=" * 60)
     print("✅ AI: Expert + Human Language Understanding")
     print(f"✅ Acc: Blox Fruit 6 Perm - 250k (DUY NHẤT)")
-    print(f"✅ Không có acc 100k, 150k, 300k...")
-    print(f"✅ Trái cây: {len(FRUIT_PRICES_RB)} loại (mới nhất)")
+    print(f"✅ Trái cây: {len(FRUIT_PRICES_RB)} loại")
     print(f"✅ Gamepass: {len(GAMEPASS_PRICES_RB)} loại")
-    print(f"✅ Tỷ lệ: 1 RB = {FRUIT_RATE}đ (có thể đổi)")
-    print("✅ Tính năng: Tính giá RB × Rate = VNĐ")
+    print(f"✅ Tỷ lệ: 1 RB = {FRUIT_RATE}đ")
+    print("-" * 60)
+    print("💳 SePay QR: " + ("✅ ON" if sepay.is_configured() else "⚠️ OFF (chua config)"))
+    print("📢 Admin Noti: " + ("✅ ON" if admin_notifier.is_configured() else "⚠️ OFF (chua config)"))
+    print("🗄️  Database: SQLite (shop_data.db)")
     print("=" * 60)
     
     if not TELEGRAM_TOKEN:
         print("❌ Thiếu TELEGRAM_BOT_TOKEN")
         return
     
-    # Start keep-alive
-    threading.Thread(target=start_keep_alive, daemon=True).start()
+    # Start server (keep-alive + webhook)
+    threading.Thread(target=start_server, daemon=True).start()
     
     global last_update_id
     print("\n🚀 Đang chạy...\n")
@@ -1173,8 +1585,11 @@ def main():
             if updates and updates.get('ok') and updates.get('result'):
                 for update in updates['result']:
                     last_update_id = update['update_id']
+                    
                     if 'message' in update:
                         handle_message(update['message'])
+                    elif 'callback_query' in update:
+                        handle_callback(update)
             
             time.sleep(1)
         except KeyboardInterrupt:
